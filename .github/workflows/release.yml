@@ -4,9 +4,15 @@ on:
   push:
     tags:
       - 'v*'          # baut & released bei Tags wie v0.1.0
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag (z. B. v0.1.0), der in allen Repos ausgecheckt und für das Release verwendet werden soll'
+        required: true
+        type: string
 
 concurrency:
-  group: moddex-release-${{ github.ref_name }}
+  group: moddex-release-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -14,6 +20,9 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write   # nötig für Release-Upload
+    env:
+      # Bei manuellem Lauf kommt der Tag aus dem Input, sonst aus dem Tag-Ref
+      TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
     steps:
       # 1) Dieses (Packaging-)Repo
@@ -22,21 +31,21 @@ jobs:
         with:
           fetch-depth: 0   # falls du Tag-Infos brauchst
 
-      # 2) Backend-Repo (privat) – gleicher Tag wie Trigger
+      # 2) Backend-Repo (privat) – gleicher Tag wie Trigger/Manuell
       - name: Checkout backend at same tag
         uses: actions/checkout@v4
         with:
           repository: aklozyp/Moddex-Backend
-          ref: ${{ github.ref_name }}
+          ref: ${{ env.TARGET_REF }}
           path: Moddex-Backend
           token: ${{ secrets.GH_TOKEN }}   # fine-grained PAT mit Contents: Read
 
-      # 3) Frontend-Repo (privat) – gleicher Tag wie Trigger
+      # 3) Frontend-Repo (privat) – gleicher Tag wie Trigger/Manuell
       - name: Checkout frontend at same tag
         uses: actions/checkout@v4
         with:
           repository: aklozyp/Moddex-Frontend
-          ref: ${{ github.ref_name }}
+          ref: ${{ env.TARGET_REF }}
           path: Moddex-Frontend
           token: ${{ secrets.GH_TOKEN }}
 
@@ -46,7 +55,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven   # aktiviert Maven-Dependency-Cache (lokales Repo) :contentReference[oaicite:2]{index=2}
+          cache: maven
 
       # 5) Backend bauen (über mvnw im Backend-Ordner)
       - name: Build backend JAR
@@ -63,8 +72,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'                                  # npm-Cache aktivieren
-          cache-dependency-path: 'Moddex-Frontend/package-lock.json'  # Pfad zum Lockfile :contentReference[oaicite:3]{index=3}
+          cache: 'npm'
+          cache-dependency-path: 'Moddex-Frontend/package-lock.json'
 
       # 7) Frontend bauen
       - name: Build frontend dist
@@ -75,8 +84,6 @@ jobs:
           popd
           mkdir -p build/frontend
           rsync -a --delete Moddex-Frontend/dist/ build/frontend/
-        # Falls dein Angular-Build in einen anderen Ordner schreibt,
-        # passe den rsync-Pfad entsprechend an.
 
       # 8) Bundle zusammenstellen (Skripte/Templates + Artefakte)
       - name: Assemble bundle
@@ -92,15 +99,14 @@ jobs:
           if [ -d config/defaults ]; then cp -r config/defaults/* bundle/config/defaults/ || true; fi
 
           # Tarball + Checksum
-          tar -C bundle -czf moddex-${{ github.ref_name }}-linux-amd64.tar.gz .
-          sha256sum moddex-${{ github.ref_name }}-linux-amd64.tar.gz > moddex-${{ github.ref_name }}-SHA256SUMS
+          tar -C bundle -czf moddex-$TARGET_REF-linux-amd64.tar.gz .
+          sha256sum moddex-$TARGET_REF-linux-amd64.tar.gz > moddex-$TARGET_REF-SHA256SUMS
 
       # 9) Release erstellen und Assets hochladen
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TARGET_REF }}
           files: |
-            moddex-${{ github.ref_name }}-linux-amd64.tar.gz
-            moddex-${{ github.ref_name }}-SHA256SUMS
-        # Hinweis: dieser Step setzt voraus, dass das Event ein Tag-Push ist
-        # und dass das Job-Permission 'contents: write' gesetzt ist. :contentReference[oaicite:4]{index=4}
+            moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz
+            moddex-${{ env.TARGET_REF }}-SHA256SUMS
