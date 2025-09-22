@@ -1,0 +1,13 @@
+[Unit]
+Description=Moddex Caddy Reverse Proxy
+After=network.target
+
+[Service]
+User=root
+Group=root
+ExecStart=/usr/bin/caddy run --config /etc/moddex/Caddyfile --adapter caddyfile
+ExecReload=/usr/bin/caddy reload --config /etc/moddex/Caddyfile --adapter caddyfile
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

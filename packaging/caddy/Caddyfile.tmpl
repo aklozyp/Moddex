@@ -1,0 +1,21 @@
+{$DOMAIN:8443}
+{
+  {$if MODE == "public"}email {$EMAIL}{$end}
+  {$if MODE != "public"}local_certs{$end}
+}
+encode zstd gzip
+basic_auth /* {
+  admin {$HTPASS_ADMIN_HASH}
+}
+handle_path / {
+  root * /var/lib/moddex/ui
+  file_server
+}
+handle /api/* {
+  rewrite * /{path}
+  reverse_proxy 127.0.0.1:8080
+}
+{$if MODE == "public"}
+header { Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" }
+{$end}
+log { output file /var/lib/moddex/logs/access.log }

@@ -1,0 +1,17 @@
+[Unit]
+Description=Moddex Backend
+After=network.target
+
+[Service]
+User=moddex
+Group=moddex
+WorkingDirectory=/opt/moddex
+ExecStart=/usr/bin/env java -jar /opt/moddex/app.jar
+SuccessExitStatus=143
+Restart=on-failure
+StandardOutput=append:/var/lib/moddex/logs/backend.out.log
+StandardError=append:/var/lib/moddex/logs/backend.err.log
+Environment=JAVA_TOOL_OPTIONS=-Dserver.port=8080 -Dserver.address=127.0.0.1
+
+[Install]
+WantedBy=multi-user.target

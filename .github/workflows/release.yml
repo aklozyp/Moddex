@@ -1,0 +1,81 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-package:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout packaging repo (this)
+        uses: actions/checkout@v4
+
+      # ⬇ Backend-Repo auschecken (genau denselben Tag wie im Packaging-Repo)
+      - name: Checkout backend at same tag
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Backend
+          ref: ${{ github.ref_name }}
+          path: BACKEND_REPO
+          token: ${{ secrets.GH_TOKEN }}
+
+      # ⬇ Frontend-Repo auschecken
+      - name: Checkout frontend at same tag
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Frontend
+          ref: ${{ github.ref_name }}
+          path: FRONTEND_REPO
+          token: ${{ secrets.GH_TOKEN }}
+
+      # Falls BACKEND/FRONTEND privat sind, zusätzlich:
+      # with.token: ${{ secrets.GH_TOKEN }}
+      # und Secret GH_TOKEN mit "read" auf beide Repos anlegen.
+
+      # Java/Maven für Backend
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build backend JAR
+        run: |
+          ./mvnw -f BACKEND_REPO/pom.xml -B -DskipTests clean package
+          mkdir -p build/backend
+          cp BACKEND_REPO/target/*.jar build/backend/Moddex-Backend.jar
+
+      # Node/Angular für Frontend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Build frontend dist
+        run: |
+          pushd FRONTEND_REPO
+          npm ci
+          npm run build --if-present || npm run build
+          popd
+          mkdir -p build/frontend
+          # passe den Dist-Pfad an, falls Angular einen abweichenden Ordner erzeugt:
+          rsync -a --delete FRONTEND_REPO/dist/ build/frontend/
+
+      # Bundle zusammenstellen
+      - name: Assemble bundle
+        run: |
+          mkdir -p bundle/scripts bundle/packaging/systemd bundle/packaging/caddy bundle/config/defaults bundle/frontend bundle/backend
+          cp -r build/frontend/* bundle/frontend/
+          cp -r build/backend/Moddex-Backend.jar bundle/backend/
+          cp -r scripts/* bundle/scripts/
+          cp -r packaging/systemd/* bundle/packaging/systemd/
+          cp -r packaging/caddy/* bundle/packaging/caddy/
+          cp -r config/defaults/* bundle/config/defaults/ || true
+          tar -C bundle -czf moddex-${{ github.ref_name }}-linux-amd64.tar.gz .
+          sha256sum moddex-${{ github.ref_name }}-linux-amd64.tar.gz > moddex-${{ github.ref_name }}-SHA256SUMS
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            moddex-${{ github.ref_name }}-linux-amd64.tar.gz
+            moddex-${{ github.ref_name }}-SHA256SUMS
