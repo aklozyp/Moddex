@@ -9,8 +9,8 @@
 Fetches the helper script, verifies its checksum, and runs it in one go:
 
 ```bash
-curl -fsSLO https://github.com/aklozyp/Moddex-build/releases/latest/download/download.sh && \
-curl -fsSLO https://github.com/aklozyp/Moddex-build/releases/latest/download/download.sh.sha256 && \
+curl -fsSLO https://github.com/aklozyp/Moddex/releases/latest/download/download.sh && \
+curl -fsSLO https://github.com/aklozyp/Moddex/releases/latest/download/download.sh.sha256 && \
 sha256sum -c download.sh.sha256 && \
 bash download.sh --run
 ```
