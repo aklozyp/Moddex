@@ -3,11 +3,11 @@ name: release
 on:
   push:
     tags:
-      - 'v*'          # baut & released bei Tags wie v0.1.0
+      - 'v*'          # build & release for tags like v0.1.0
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag (z. B. v0.1.0), der in allen Repos ausgecheckt und für das Release verwendet werden soll'
+        description: 'Tag (e.g. v0.1.0) that will be checked out in all repos for the release'
         required: true
         type: string
 
@@ -19,28 +19,27 @@ jobs:
   build-package:
     runs-on: ubuntu-22.04
     permissions:
-      contents: write   # nötig für Release-Upload
+      contents: write   # required for release upload
     env:
-      # Bei manuellem Lauf kommt der Tag aus dem Input, sonst aus dem Tag-Ref
       TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
 
     steps:
-      # 1) Dieses (Packaging-)Repo
+      # 1) Checkout this packaging repo
       - name: Checkout packaging repo (this)
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # falls du Tag-Infos brauchst
+          fetch-depth: 0   # keep tag metadata
 
-      # 2) Backend-Repo (privat) – gleicher Tag wie Trigger/Manuell
+      # 2) Backend repo (private) - same tag as trigger/manual run
       - name: Checkout backend at same tag
         uses: actions/checkout@v4
         with:
           repository: aklozyp/Moddex-Backend
           ref: ${{ env.TARGET_REF }}
           path: Moddex-Backend
-          token: ${{ secrets.GH_TOKEN }}   # fine-grained PAT mit Contents: Read
+          token: ${{ secrets.GH_TOKEN }}   # fine-grained PAT with Contents:Read
 
-      # 3) Frontend-Repo (privat) – gleicher Tag wie Trigger/Manuell
+      # 3) Frontend repo (private) - same tag as trigger/manual run
       - name: Checkout frontend at same tag
         uses: actions/checkout@v4
         with:
@@ -49,7 +48,7 @@ jobs:
           path: Moddex-Frontend
           token: ${{ secrets.GH_TOKEN }}
 
-      # 4) Java 21 + Maven-Cache
+      # 4) Java 21 + Maven cache
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -57,7 +56,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # 5) Backend bauen (über mvnw im Backend-Ordner)
+      # 5) Build backend (via mvnw in backend folder)
       - name: Build backend JAR
         run: |
           chmod +x Moddex-Backend/mvnw
@@ -67,7 +66,7 @@ jobs:
           mkdir -p build/backend
           cp Moddex-Backend/target/*.jar build/backend/Moddex-Backend.jar
 
-      # 6) Node 20 + npm-Cache
+      # 6) Node 20 + npm cache
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -75,34 +74,37 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'Moddex-Frontend/package-lock.json'
 
-      # 7) Frontend bauen
+      # 7) Build frontend dist
       - name: Build frontend dist
         run: |
           pushd Moddex-Frontend
           npm ci
-          npm run build --if-present || npm run build
+          npm run build --if-present
           popd
           mkdir -p build/frontend
           rsync -a --delete Moddex-Frontend/dist/ build/frontend/
 
-      # 8) Bundle zusammenstellen (Skripte/Templates + Artefakte)
+      # 8) Assemble bundle (scripts/templates + artifacts)
       - name: Assemble bundle
         run: |
           mkdir -p bundle/scripts bundle/packaging/systemd bundle/packaging/caddy bundle/config/defaults bundle/frontend bundle/backend
-          # Artefakte
           cp -r build/frontend/* bundle/frontend/
           cp -r build/backend/Moddex-Backend.jar bundle/backend/
-          # Packaging-Inhalte aus DIESEM Repo
           cp -r scripts/* bundle/scripts/
           cp -r packaging/systemd/* bundle/packaging/systemd/
           cp -r packaging/caddy/* bundle/packaging/caddy/
           if [ -d config/defaults ]; then cp -r config/defaults/* bundle/config/defaults/ || true; fi
 
-          # Tarball + Checksum
           tar -C bundle -czf moddex-$TARGET_REF-linux-amd64.tar.gz .
           sha256sum moddex-$TARGET_REF-linux-amd64.tar.gz > moddex-$TARGET_REF-SHA256SUMS
 
-      # 9) Release erstellen und Assets hochladen
+      # 9) Prepare download script artifacts
+      - name: Prepare download script assets
+        run: |
+          cp scripts/download.sh download.sh
+          sha256sum download.sh > download.sh.sha256
+
+      # 10) Create release and upload assets
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -110,3 +112,7 @@ jobs:
           files: |
             moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz
             moddex-${{ env.TARGET_REF }}-SHA256SUMS
+            download.sh
+            download.sh.sha256
+
+
