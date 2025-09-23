@@ -126,7 +126,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-TARBALL="${WORKDIR}/bundle.tar.gz"
+TARBALL="${WORKDIR}/$(basename "$TARBALL_URL")"
 SUMS="${WORKDIR}/SHA256SUMS"
 
 download_to_file "$TARBALL_URL" "$TARBALL"
