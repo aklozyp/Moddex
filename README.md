@@ -12,7 +12,7 @@ Fetches the helper script, verifies its checksum, and runs it in one go:
 curl -fsSLO https://github.com/aklozyp/Moddex-build/releases/latest/download/download.sh && \
 curl -fsSLO https://github.com/aklozyp/Moddex-build/releases/latest/download/download.sh.sha256 && \
 sha256sum -c download.sh.sha256 && \
-bash download.sh
+bash download.sh --run
 ```
 
 The installer prompts for mode, domain, email, and password during execution.

@@ -15,7 +15,6 @@ trap 'echo "ERROR: installation aborted." >&2; exit 1' ERR
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TEMPLATE_DIR="$PROJECT_ROOT/packaging/caddy"
 SYSTEMD_DIR="$PROJECT_ROOT/packaging/systemd"
 
 MODE="local"
@@ -103,7 +102,6 @@ FRONTEND_DIR="${FRONTEND_DIR:-$PROJECT_ROOT/frontend}"
 
 [[ -f "$BACKEND_JAR" ]] || die "Backend artifact not found at $BACKEND_JAR"
 [[ -d "$FRONTEND_DIR" ]] || die "Frontend directory not found at $FRONTEND_DIR"
-[[ -f "$TEMPLATE_DIR/Caddyfile.tmpl" ]] || die "Missing template: $TEMPLATE_DIR/Caddyfile.tmpl"
 [[ -f "$SYSTEMD_DIR/moddex-backend.service" ]] || die "Missing unit file: $SYSTEMD_DIR/moddex-backend.service"
 [[ -f "$SYSTEMD_DIR/moddex-caddy.service" ]] || die "Missing unit file: $SYSTEMD_DIR/moddex-caddy.service"
 
@@ -151,7 +149,6 @@ ensure_caddy
 
 need_cmd rsync
 need_cmd htpasswd
-need_cmd envsubst
 need_cmd systemctl
 need_cmd install
 need_cmd id
@@ -202,23 +199,26 @@ log "Generating Caddyfile"
         echo ":8443 {"
         echo "  local_certs"
     fi
-    echo "}"
-    echo "encode zstd gzip"
-    echo "basic_auth /* {"
-    echo "  admin $HTPASS_ADMIN_HASH"
-    echo "}"
-    echo "handle_path / {"
-    echo "  root * /var/lib/moddex/ui"
-    echo "  file_server"
-    echo "}"
-    echo "handle /api/* {"
-    echo "  rewrite * /{path}"
-    echo "  reverse_proxy 127.0.0.1:8080"
-    echo "}"
+
+    echo "    encode zstd gzip"
+    echo "    basic_auth /* {"
+    printf '        admin %s\n' "$HTPASS_ADMIN_HASH"
+    echo "    }"
+    echo "    handle_path / {"
+    echo "        root * /var/lib/moddex/ui"
+    echo "        file_server"
+    echo "    }"
+    echo "    handle /api/* {"
+    echo "        rewrite * /{path}"
+    echo "        reverse_proxy 127.0.0.1:8080"
+    echo "    }"
+
     if [[ "$MODE" == "public" ]]; then
-        echo 'header { Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" }'
+        echo '    header { Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" }'
     fi
-    echo "log { output file /var/lib/moddex/logs/access.log }"
+
+    echo "    log { output file /var/lib/moddex/logs/access.log }"
+    echo "}"
 } > /etc/moddex/Caddyfile
 
 chmod 0644 /etc/moddex/Caddyfile
