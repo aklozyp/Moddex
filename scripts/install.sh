@@ -123,7 +123,7 @@ apt_install() {
 }
 
 log "Installing required packages"
-apt_install curl rsync apache2-utils gettext-base ca-certificates
+apt_install curl rsync apache2-utils ca-certificates
 
 ensure_caddy_repo() {
   local list_file="/etc/apt/sources.list.d/caddy-stable.list"

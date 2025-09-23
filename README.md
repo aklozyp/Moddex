@@ -27,7 +27,7 @@ The installer prompts for mode, domain, email, and password during execution.
    ```
 3. Verify the archive:
    ```bash
-   grep linux-amd64 moddex-$TAG-SHA256SUMS | sha256sum --check
+   grep "moddex-$TAG-linux-amd64.tar.gz" moddex-$TAG-SHA256SUMS | sha256sum --check
    ```
 4. Extract the archive and switch into the bundle directory:
    ```bash

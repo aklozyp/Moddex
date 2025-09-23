@@ -80,28 +80,27 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"
 }
 
+_resolve_path_helper() {
+  local path_to_resolve="$1"
+  if command -v realpath >/dev/null 2>&1; then
+    realpath "$path_to_resolve"
+  elif command -v readlink >/dev/null 2>&1; then
+    readlink -f "$path_to_resolve"
+  else
+    printf '%s\n' "$path_to_resolve"
+  fi
+}
+
 resolve_script_path() {
   local source="${BASH_SOURCE[0]}"
   if [[ -z "$source" || "$source" == "-" || "$source" == "bash" ]]; then
     if [[ -n "${MODDEX_DOWNLOAD_SCRIPT:-}" && -f "${MODDEX_DOWNLOAD_SCRIPT}" ]]; then
-      if command -v realpath >/dev/null 2>&1; then
-        realpath "${MODDEX_DOWNLOAD_SCRIPT}"
-      elif command -v readlink >/dev/null 2>&1; then
-        readlink -f "${MODDEX_DOWNLOAD_SCRIPT}"
-      else
-        printf '%s\n' "${MODDEX_DOWNLOAD_SCRIPT}"
-      fi
+      _resolve_path_helper "${MODDEX_DOWNLOAD_SCRIPT}"
       return 0
     fi
     return 1
   fi
-  if command -v realpath >/dev/null 2>&1; then
-    realpath "$source"
-  elif command -v readlink >/dev/null 2>&1; then
-    readlink -f "$source"
-  else
-    printf '%s\n' "$source"
-  fi
+  _resolve_path_helper "$source"
 }
 
 verify_self_checksum() {
