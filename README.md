@@ -4,6 +4,14 @@
 
 ## Installation
 
+### Prerequisites
+
+Make sure curl is installed. If it’s already available, you can skip this step:
+
+```bash
+sudo apt update && sudo apt install curl -y 
+```
+
 ### Automatic
 
 Fetches the helper script, verifies its checksum, and runs it in one go:
