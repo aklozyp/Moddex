@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g., v0.1.1)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -14,6 +20,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve TAG
+        id: vars
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "TAG=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Resolved TAG=${{ steps.vars.outputs.TAG }}"
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -42,12 +58,12 @@ jobs:
           cp packaging/systemd/moddex-backend.service dist/bundle/packaging/systemd/
           cp packaging/systemd/moddex-caddy.service dist/bundle/packaging/systemd/
           # Write VERSION file from tag
-          echo "${GITHUB_REF_NAME}" > dist/bundle/VERSION
+          echo "${{ steps.vars.outputs.TAG }}" > dist/bundle/VERSION
 
       - name: Create tarball
         id: tar
         run: |
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ steps.vars.outputs.TAG }}"
           NAME="moddex-${TAG}-linux-amd64.tar.gz"
           (cd dist && tar -czf "${NAME}" bundle)
           echo "name=${NAME}" >> "$GITHUB_OUTPUT"
@@ -66,7 +82,7 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ steps.vars.outputs.TAG }}
           files: |
             dist/${{ steps.tar.outputs.name }}
             dist/${{ steps.tar.outputs.name }}.sha256
