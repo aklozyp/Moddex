@@ -1,118 +1,75 @@
-name: release
+name: Release
 
 on:
   push:
     tags:
-      - 'v*'          # build & release for tags like v0.1.0
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Tag (e.g. v0.1.0) that will be checked out in all repos for the release'
-        required: true
-        type: string
+      - "v*.*.*"
 
-concurrency:
-  group: moddex-release-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
-  cancel-in-progress: false
+permissions:
+  contents: write
 
 jobs:
-  build-package:
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: write   # required for release upload
-    env:
-      TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
-
+  build-and-release:
+    runs-on: ubuntu-latest
     steps:
-      # 1) Checkout this packaging repo
-      - name: Checkout packaging repo (this)
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # keep tag metadata
 
-      # 2) Backend repo (private) - same tag as trigger/manual run
-      - name: Checkout backend at same tag
-        uses: actions/checkout@v4
-        with:
-          repository: aklozyp/Moddex-Backend
-          ref: ${{ env.TARGET_REF }}
-          path: Moddex-Backend
-          token: ${{ secrets.GH_TOKEN }}   # fine-grained PAT with Contents:Read
-
-      # 3) Frontend repo (private) - same tag as trigger/manual run
-      - name: Checkout frontend at same tag
-        uses: actions/checkout@v4
-        with:
-          repository: aklozyp/Moddex-Frontend
-          ref: ${{ env.TARGET_REF }}
-          path: Moddex-Frontend
-          token: ${{ secrets.GH_TOKEN }}
-
-      # 4) Java 21 + Maven cache
-      - name: Set up Java
+      - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
 
-      # 5) Build backend (via mvnw in backend folder)
-      - name: Build backend JAR
+      - name: Build backend
         run: |
-          chmod +x Moddex-Backend/mvnw
-          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -DskipTests clean package
-      - name: Collect backend artifact
+          ./gradlew :backend:build
+          mkdir -p dist/bundle/backend
+          cp backend/build/libs/*-all.jar dist/bundle/backend/Moddex-Backend.jar || cp backend/build/libs/*.jar dist/bundle/backend/Moddex-Backend.jar
+
+      - name: Build frontend
         run: |
-          mkdir -p build/backend
-          cp Moddex-Backend/target/*.jar build/backend/Moddex-Backend.jar
+          npm ci --prefix frontend
+          npm run build --prefix frontend
+          mkdir -p dist/bundle/frontend
+          cp -r frontend/dist/* dist/bundle/frontend/
 
-      # 6) Node 20 + npm cache
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'Moddex-Frontend/package-lock.json'
-
-      # 7) Build frontend dist
-      - name: Build frontend dist
+      - name: Copy packaging scripts
         run: |
-          pushd Moddex-Frontend
-          npm ci
-          npm run build --if-present
-          popd
-          mkdir -p build/frontend
-          rsync -a --delete Moddex-Frontend/dist/ build/frontend/
+          mkdir -p dist/bundle/scripts dist/bundle/packaging/systemd
+          cp scripts/install.sh dist/bundle/scripts/
+          cp scripts/uninstall.sh dist/bundle/scripts/
+          cp packaging/systemd/moddex-backend.service dist/bundle/packaging/systemd/
+          cp packaging/systemd/moddex-caddy.service dist/bundle/packaging/systemd/
+          # Write VERSION file from tag
+          echo "${GITHUB_REF_NAME}" > dist/bundle/VERSION
 
-      # 8) Assemble bundle (scripts/templates + artifacts)
-      - name: Assemble bundle
+      - name: Create tarball
+        id: tar
         run: |
-          mkdir -p bundle/scripts bundle/packaging/systemd bundle/packaging/caddy bundle/config/defaults bundle/frontend bundle/backend
-          cp -r build/frontend/* bundle/frontend/
-          cp -r build/backend/Moddex-Backend.jar bundle/backend/
-          cp -r scripts/* bundle/scripts/
-          cp -r packaging/systemd/* bundle/packaging/systemd/
-          cp -r packaging/caddy/* bundle/packaging/caddy/
-          if [ -d config/defaults ]; then cp -r config/defaults/* bundle/config/defaults/ || true; fi
+          TAG="${GITHUB_REF_NAME}"
+          NAME="moddex-${TAG}-linux-amd64.tar.gz"
+          (cd dist && tar -czf "${NAME}" bundle)
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
 
-          tar -C bundle -czf moddex-$TARGET_REF-linux-amd64.tar.gz .
-          sha256sum moddex-$TARGET_REF-linux-amd64.tar.gz > moddex-$TARGET_REF-SHA256SUMS
-
-      # 9) Prepare download script artifacts
-      - name: Prepare download script assets
+      - name: Generate checksums
         run: |
-          cp scripts/download.sh download.sh
-          sha256sum download.sh > download.sh.sha256
+          cd dist
+          sha256sum "${{ steps.tar.outputs.name }}" > "${{ steps.tar.outputs.name }}.sha256"
 
-      # 10) Create release and upload assets
-      - name: Create GitHub Release
+      - name: Prepare helper scripts
+        run: |
+          cp scripts/download.sh dist/download.sh
+          cp scripts/update.sh dist/update.sh
+          (cd dist && sha256sum download.sh > download.sh.sha256)
+
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.TARGET_REF }}
+          tag_name: ${{ github.ref_name }}
           files: |
-            moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz
-            moddex-${{ env.TARGET_REF }}-SHA256SUMS
-            download.sh
-            download.sh.sha256
-
-
+            dist/${{ steps.tar.outputs.name }}
+            dist/${{ steps.tar.outputs.name }}.sha256
+            dist/download.sh
+            dist/download.sh.sha256
+            dist/update.sh

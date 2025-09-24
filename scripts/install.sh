@@ -165,6 +165,12 @@ install -d -m 0755 -o moddex -g moddex /var/lib/moddex/logs
 install -d -m 0750 -o moddex -g moddex /etc/moddex
 
 log "Deploying application artifacts"
+# Record version if the bundle provides it
+if [[ -f "$PROJECT_ROOT/VERSION" ]]; then
+  install -m 0644 "$PROJECT_ROOT/VERSION" /opt/moddex/VERSION
+  chown moddex:moddex /opt/moddex/VERSION
+fi
+
 install -m 0644 "$BACKEND_JAR" /opt/moddex/app.jar
 chown moddex:moddex /opt/moddex/app.jar
 rsync -a --delete "${FRONTEND_DIR}/" /var/lib/moddex/ui/

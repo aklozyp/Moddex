@@ -31,11 +31,11 @@ The installer prompts for mode, domain, email, and password during execution.
 2. Download the bundle and checksum list from the Moddex release:
    ```bash
    curl -fsSLO https://github.com/aklozyp/Moddex/releases/download/$TAG/moddex-$TAG-linux-amd64.tar.gz
-   curl -fsSLO https://github.com/aklozyp/Moddex/releases/download/$TAG/moddex-$TAG-SHA256SUMS
+   curl -fsSLO https://github.com/aklozyp/Moddex/releases/download/$TAG/moddex-$TAG-linux-amd64.tar.gz.sha256
    ```
 3. Verify the archive:
    ```bash
-   grep "moddex-$TAG-linux-amd64.tar.gz" moddex-$TAG-SHA256SUMS | sha256sum --check
+   grep "moddex-$TAG-linux-amd64.tar.gz" moddex-$TAG-linux-amd64.tar.gz.sha256 | sha256sum --check
    ```
 4. Extract the archive and switch into the bundle directory:
    ```bash
@@ -65,3 +65,15 @@ Use the bundled script to remove Moddex:
 ```bash
 sudo ./moddex-<tag>-bundle/scripts/uninstall.sh
 ```
+
+
+## Update
+
+To update to the latest release (or install if missing), use the helper:
+
+```bash
+curl -fsSLO https://github.com/aklozyp/Moddex/releases/latest/download/update.sh && \
+bash update.sh
+```
+
+The script compares `/opt/moddex/VERSION` (if present) to the latest GitHub release tag and upgrades automatically. If Moddex is not installed yet, it offers to run the installer.
