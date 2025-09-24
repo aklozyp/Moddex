@@ -96,7 +96,8 @@ jobs:
           if [ -d config/defaults ]; then cp -r config/defaults/* bundle/config/defaults/ || true; fi
 
           tar -C bundle -czf moddex-$TARGET_REF-linux-amd64.tar.gz .
-          sha256sum moddex-$TARGET_REF-linux-amd64.tar.gz > moddex-$TARGET_REF-SHA256SUMS
+          sha256sum moddex-$TARGET_REF-linux-amd64.tar.gz > moddex-$TARGET_REF-linux-amd64.tar.gz.sha256
+          echo "$TARGET_REF" > bundle/VERSION
 
       # 9) Prepare download script artifacts
       - name: Prepare download script assets
