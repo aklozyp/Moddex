@@ -1,17 +1,21 @@
 [Unit]
-Description=Moddex Backend
+Description=Moddex Backend API
 After=network.target
 
 [Service]
 User=moddex
 Group=moddex
 WorkingDirectory=/opt/moddex
+Environment=MODDEX_ROOT=/var/lib/moddex
+Environment=MODDEX_LOG_DIR=/var/lib/moddex/logs
+Environment=SERVER_ADDRESS=127.0.0.1
+Environment=SERVER_PORT=8080
 ExecStart=/usr/bin/env java -jar /opt/moddex/app.jar
-SuccessExitStatus=143
 Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143 130
 StandardOutput=append:/var/lib/moddex/logs/backend.out.log
 StandardError=append:/var/lib/moddex/logs/backend.err.log
-Environment=JAVA_TOOL_OPTIONS=-Dserver.port=8080 -Dserver.address=127.0.0.1
 
 [Install]
 WantedBy=multi-user.target

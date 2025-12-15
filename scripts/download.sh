@@ -1,41 +1,37 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# ==============================================================================
-# Configuration
-# ==============================================================================
 OWNER="${OWNER:-aklozyp}"
-BACKEND_REPO="${BACKEND_REPO:-Moddex-Backend}"
-FRONTEND_REPO="${FRONTEND_REPO:-Moddex-Frontend}"
+REPO="${REPO:-Moddex}"
 VERSION="${VERSION:-latest}"
+ASSET_SUFFIX="${ASSET_SUFFIX:-linux-amd64.tar.gz}"
 
-# ==============================================================================
-# Helpers
-# ==============================================================================
-log() { printf '[INFO] %s\n' "$*" >&2; }
-die() { printf '[ERROR] %s\n' "$*" >&2; exit 1; }
-require_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"; }
+log() { printf '[download] %s\n' "$1"; }
+die() { printf '[ERROR] %s\n' "$1" >&2; exit 1; }
+need_cmd() { command -v "$1" >/dev/null 2>&1 || die "Missing required command: $1"; }
+
+need_cmd curl
+need_cmd jq
+need_cmd tar
+need_cmd sha256sum
 
 usage() {
   cat <<'USAGE'
 Usage: download.sh [options]
 
-Downloads the latest Moddex backend and frontend artifacts and runs the installer.
+Fetches the packaged Moddex bundle from GitHub Releases and runs the installer.
 
 Options:
-  --version <tag>       Install a specific release tag (default: latest)
-  --backend-repo <repo> Specify the backend repository (default: Moddex-Backend)
-  --frontend-repo <repo> Specify the frontend repository (default: Moddex-Frontend)
-  -h, --help            Show this help and exit
+  --version <tag>   Release tag to download (default: latest)
+  --owner <owner>   GitHub owner or organization (default: aklozyp)
+  --repo <repo>     GitHub repository name (default: Moddex)
+  -h, --help        Show this help and exit
 
 Environment overrides:
-  OWNER, BACKEND_REPO, FRONTEND_REPO, VERSION
+  OWNER, REPO, VERSION, ASSET_SUFFIX
 USAGE
 }
 
-# ==============================================================================
-# Argument Parsing
-# ==============================================================================
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --version)
@@ -43,14 +39,14 @@ while [[ $# -gt 0 ]]; do
       VERSION="$2"
       shift 2
       ;;
-    --backend-repo)
-      [[ $# -ge 2 ]] || die "Missing value for --backend-repo"
-      BACKEND_REPO="$2"
+    --owner)
+      [[ $# -ge 2 ]] || die "Missing value for --owner"
+      OWNER="$2"
       shift 2
       ;;
-    --frontend-repo)
-      [[ $# -ge 2 ]] || die "Missing value for --frontend-repo"
-      FRONTEND_REPO="$2"
+    --repo)
+      [[ $# -ge 2 ]] || die "Missing value for --repo"
+      REPO="$2"
       shift 2
       ;;
     -h|--help)
@@ -58,97 +54,59 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      die "Unknown option: $1"
+      break
       ;;
   esac
 done
 
-# ==============================================================================
-# Main Logic
-# ==============================================================================
-require_cmd curl
-require_cmd jq
-require_cmd unzip
-
-# Prepare temporary directory
-DOWNLOAD_DIR="$(mktemp -d -t moddex-download.XXXXXX)"
-trap 'rm -rf "$DOWNLOAD_DIR"' EXIT
-log "Using temporary download directory: $DOWNLOAD_DIR"
-
-# --- Fetch Asset URLs from GitHub API ---
-get_asset_url() {
-  local repo="$1" asset_name_pattern="$2" version_tag="$3"
-  local api_url
-  if [[ "$version_tag" == "latest" ]]; then
-    api_url="https://api.github.com/repos/${OWNER}/${repo}/releases/latest"
-  else
-    api_url="https://api.github.com/repos/${OWNER}/${repo}/releases/tags/${version_tag}"
-  fi
-
-  log "Fetching release info from $api_url"
-  local response
-  response=$(curl -fsSL "$api_url")
-  if ! jq -e '.assets' >/dev/null 2>&1 <<< "$response"; then
-      die "Failed to fetch release info for ${OWNER}/${repo} at version ${version_tag}. Response: $response"
-  fi
-
-  local asset_url
-  asset_url=$(jq -r --arg pattern "$asset_name_pattern" '.assets[] | select(.name | test($pattern)) | .browser_download_url' <<< "$response")
-
-  if [[ -z "$asset_url" ]]; then
-    die "Could not find asset matching pattern '${asset_name_pattern}' in release ${version_tag} of ${OWNER}/${repo}"
-  fi
-  echo "$asset_url"
-}
-
-# --- Download Artifacts ---
-BACKEND_ASSET_URL=$(get_asset_url "$BACKEND_REPO" "Moddex-Backend.*\.jar$" "$VERSION")
-FRONTEND_ASSET_URL=$(get_asset_url "$FRONTEND_REPO" "Moddex-Frontend.*\.zip$" "$VERSION")
-
-BACKEND_JAR_PATH="$DOWNLOAD_DIR/Moddex-Backend.jar"
-FRONTEND_ZIP_PATH="$DOWNLOAD_DIR/Moddex-Frontend.zip"
-FRONTEND_EXTRACT_PATH="$DOWNLOAD_DIR/frontend"
-
-log "Downloading Backend: $BACKEND_ASSET_URL"
-curl -L --output "$BACKEND_JAR_PATH" "$BACKEND_ASSET_URL"
-
-log "Downloading Frontend: $FRONTEND_ASSET_URL"
-curl -L --output "$FRONTEND_ZIP_PATH" "$FRONTEND_ASSET_URL"
-
-# --- Prepare for Installation ---
-log "Extracting frontend artifact"
-mkdir -p "$FRONTEND_EXTRACT_PATH"
-unzip -q "$FRONTEND_ZIP_PATH" -d "$FRONTEND_EXTRACT_PATH"
-
-# Find the actual frontend build directory inside the unzipped folder
-# It often is inside a subfolder like 'dist' or the repo name
-if [[ -d "$FRONTEND_EXTRACT_PATH/dist/" ]]; then
-    FRONTEND_DIR_FINAL="$FRONTEND_EXTRACT_PATH/dist"
-elif [[ -d "$FRONTEND_EXTRACT_PATH/browser/" ]]; then
-    FRONTEND_DIR_FINAL="$FRONTEND_EXTRACT_PATH/browser"
-elif [[ -f "$FRONTEND_EXTRACT_PATH/index.html" ]]; then
-    FRONTEND_DIR_FINAL="$FRONTEND_EXTRACT_PATH"
+api_url="https://api.github.com/repos/${OWNER}/${REPO}/releases"
+if [[ "$VERSION" == "latest" ]]; then
+  api_url+="/latest"
 else
-    # If not in a standard folder, find the index.html and use its directory
-    INDEX_PATH=$(find "$FRONTEND_EXTRACT_PATH" -name "index.html" -print -quit)
-    if [[ -n "$INDEX_PATH" ]]; then
-        FRONTEND_DIR_FINAL=$(dirname "$INDEX_PATH")
-    else
-        die "Could not locate the frontend's index.html in the extracted archive."
-    fi
+  api_url+="/tags/${VERSION}"
 fi
 
-log "Located frontend assets at: $FRONTEND_DIR_FINAL"
+log "Fetching release metadata from ${api_url}"
+release_json=$(curl -fsSL "$api_url") || die "Failed to fetch release metadata"
+tag_name=$(jq -r '.tag_name // ""' <<< "$release_json")
+[[ -n "$tag_name" ]] || die "Release not found"
 
-# --- Run Installer ---
-INSTALLER_SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install.sh"
-if [[ ! -f "$INSTALLER_SCRIPT" ]]; then
-  die "Installer script not found at: $INSTALLER_SCRIPT"
+asset_name=$(jq -r --arg suffix "$ASSET_SUFFIX" '.assets[] | select(.name | endswith($suffix)) | .name' <<< "$release_json")
+asset_url=$(jq -r --arg suffix "$ASSET_SUFFIX" '.assets[] | select(.name | endswith($suffix)) | .browser_download_url' <<< "$release_json")
+[[ -n "$asset_url" ]] || die "No asset ending with $ASSET_SUFFIX found in release $tag_name"
+
+sha_asset_url=$(jq -r --arg name "$asset_name.sha256" '.assets[] | select(.name == $name) | .browser_download_url' <<< "$release_json")
+
+temp_dir=$(mktemp -d -t moddex-bundle.XXXXXX)
+trap 'rm -rf "$temp_dir"' EXIT
+log "Using temporary directory $temp_dir"
+
+bundle_path="$temp_dir/$asset_name"
+log "Downloading bundle $asset_name"
+curl -fsSL "$asset_url" -o "$bundle_path"
+
+if [[ -n "$sha_asset_url" && "$sha_asset_url" != "null" ]]; then
+  log "Downloading checksum"
+  curl -fsSL "$sha_asset_url" -o "$bundle_path.sha256"
+  (cd "$temp_dir" && sha256sum -c "$(basename "$bundle_path").sha256")
+else
+  log "Checksum asset missing; computing locally"
+  (cd "$temp_dir" && sha256sum "$(basename "$bundle_path")" > "$(basename "$bundle_path").sha256")
 fi
 
-log "Starting installer..."
-chmod +x "$INSTALLER_SCRIPT"
+extract_dir="$temp_dir/bundle"
+mkdir -p "$extract_dir"
+tar -C "$extract_dir" -xzf "$bundle_path"
 
-# Execute installer with sudo, passing required artifact paths
-# The installer itself handles sudo escalation if needed.
-exec "$INSTALLER_SCRIPT" --backend-jar "$BACKEND_JAR_PATH" --frontend-dir "$FRONTEND_DIR_FINAL" "$@"
+backend_jar="$extract_dir/backend/Moddex-Backend.jar"
+frontend_dir="$extract_dir/frontend"
+
+[[ -f "$backend_jar" ]] || die "Backend JAR not found in bundle"
+[[ -d "$frontend_dir" ]] || die "Frontend directory missing in bundle"
+
+installer="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/install.sh"
+[[ -f "$installer" ]] || die "Installer script not found at $installer"
+chmod +x "$installer"
+
+log "Running installer"
+exec "$installer" --backend-jar "$backend_jar" --frontend-dir "$frontend_dir" "$@"

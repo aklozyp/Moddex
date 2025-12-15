@@ -70,7 +70,7 @@ fi
 
 echo "[INFO] Updating to $LATEST ..."
 # Stop services before replacing artifacts (installer will re-enable/start)
-sudo systemctl stop moddex-backend moddex-caddy || true
+sudo systemctl stop moddex-backend || true
 
 # Run the regular downloader in non-interactive mode
 AUTO_RUN=1 VERSION="$LATEST" bash ./download.sh

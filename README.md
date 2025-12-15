@@ -14,7 +14,9 @@ sudo apt update && sudo apt install curl -y
 
 ### Automatic
 
-Fetches the helper script, verifies its checksum, and runs it in one go:
+Fetches the helper script, verifies its checksum, and runs it in one go. The script downloads the
+packaged Moddex bundle (`moddex-<tag>-linux-amd64.tar.gz`), verifies the checksum and invokes the
+installer contained in the archive.
 
 ```bash
 curl -fsSLO https://github.com/aklozyp/Moddex/releases/latest/download/download.sh && \
@@ -23,7 +25,7 @@ sha256sum -c download.sh.sha256 && \
 bash download.sh --run
 ```
 
-The installer prompts for mode, domain, email, and password during execution.
+The installer prompts for the deployment mode during execution.
 
 ### Manual
 
@@ -39,8 +41,9 @@ The installer prompts for mode, domain, email, and password during execution.
    ```
 4. Extract the archive and switch into the bundle directory:
    ```bash
-   tar -xzf moddex-$TAG-linux-amd64.tar.gz
-   cd moddex-$TAG-bundle
+   mkdir moddex-$TAG
+   tar -C moddex-$TAG -xzf moddex-$TAG-linux-amd64.tar.gz
+   cd moddex-$TAG
    ```
 5. Run the installer with elevated privileges:
    ```bash
@@ -52,11 +55,9 @@ The installer prompts for mode, domain, email, and password during execution.
 The installer accepts optional arguments and environment variables if you need to skip prompts or override defaults:
 
 - `--mode local|lan|public` - Deployment mode (default: `local`).
-- `--domain <name>` - Public hostname, required when `--mode public`.
-- `--email <address>` - ACME contact address for public mode certificates.
-- `--password <value>` - Admin password for HTTP basic authentication. You can also export `MODDEX_ADMIN_PASSWORD`.
 - `--backend-jar <path>` - Custom backend JAR (default: `../backend/Moddex-Backend.jar`).
 - `--frontend-dir <path>` - Custom frontend build directory (default: `../frontend`).
+- `--port <number>` - Override the backend listen port (default: `8080`).
 
 ## Uninstall
 
@@ -77,3 +78,16 @@ bash update.sh
 ```
 
 The script compares `/opt/moddex/VERSION` (if present) to the latest GitHub release tag and upgrades automatically. If Moddex is not installed yet, it offers to run the installer.
+
+## Building from source
+
+Use the bundled helper to build the backend, the frontend, and assemble the deployable archive:
+
+```bash
+VERSION=$(git describe --tags --always) Moddex-build/scripts/build-bundle.sh
+ls Moddex-build/build
+# => moddex-<version>-linux-amd64.tar.gz and checksum file
+```
+
+The script requires Java 17+, Node.js 20+, Maven (via the wrapper), npm, and `tar`. It produces a
+standalone bundle identical to the release assets, ready to be installed via `scripts/install.sh`.

@@ -25,28 +25,10 @@ jobs:
 
     steps:
       # 1) Checkout this packaging repo
-      - name: Checkout packaging repo (this)
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # keep tag metadata
-
-      # 2) Backend repo (private) - same tag as trigger/manual run
-      - name: Checkout backend at same tag
-        uses: actions/checkout@v4
-        with:
-          repository: aklozyp/Moddex-Backend
-          ref: ${{ env.TARGET_REF }}
-          path: Moddex-Backend
-          token: ${{ secrets.GH_TOKEN }}   # fine-grained PAT with Contents:Read
-
-      # 3) Frontend repo (private) - same tag as trigger/manual run
-      - name: Checkout frontend at same tag
-        uses: actions/checkout@v4
-        with:
-          repository: aklozyp/Moddex-Frontend
-          ref: ${{ env.TARGET_REF }}
-          path: Moddex-Frontend
-          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
 
       # 4) Java 21 + Maven cache
       - name: Set up Java
@@ -57,14 +39,14 @@ jobs:
           cache: maven
 
       # 5) Build backend (via mvnw in backend folder)
-      - name: Build backend JAR
+      - name: Run backend tests
         run: |
           chmod +x Moddex-Backend/mvnw
-          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -DskipTests clean package
-      - name: Collect backend artifact
+          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pci test
+
+      - name: Build backend JAR
         run: |
-          mkdir -p build/backend
-          cp Moddex-Backend/target/*.jar build/backend/Moddex-Backend.jar
+          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pprod -DskipTests clean package
 
       # 6) Node 20 + npm cache
       - name: Set up Node.js
@@ -75,34 +57,36 @@ jobs:
           cache-dependency-path: 'Moddex-Frontend/package-lock.json'
 
       # 7) Build frontend dist
-      - name: Build frontend dist
+      - name: Install frontend dependencies
         run: |
           pushd Moddex-Frontend
           npm ci
-          npm run build --if-present
           popd
-          mkdir -p build/frontend
-          rsync -a --delete Moddex-Frontend/dist/ build/frontend/
 
-      # 8) Assemble bundle (scripts/templates + artifacts)
-      - name: Assemble bundle
+      - name: Run frontend tests
         run: |
-          mkdir -p bundle/scripts bundle/packaging/systemd bundle/packaging/caddy bundle/config/defaults bundle/frontend bundle/backend
-          cp -r build/frontend/* bundle/frontend/
-          cp -r build/backend/Moddex-Backend.jar bundle/backend/
-          cp -r scripts/* bundle/scripts/
-          cp -r packaging/systemd/* bundle/packaging/systemd/
-          cp -r packaging/caddy/* bundle/packaging/caddy/
-          if [ -d config/defaults ]; then cp -r config/defaults/* bundle/config/defaults/ || true; fi
+          pushd Moddex-Frontend
+          npm run test -- --watch=false --browsers=ChromeHeadless
+          popd
 
-          tar -C bundle -czf moddex-$TARGET_REF-linux-amd64.tar.gz .
-          sha256sum moddex-$TARGET_REF-linux-amd64.tar.gz > moddex-$TARGET_REF-linux-amd64.tar.gz.sha256
-          echo "$TARGET_REF" > bundle/VERSION
-
-      # 9) Prepare download script artifacts
-      - name: Prepare download script assets
+      - name: Build frontend dist
         run: |
-          cp scripts/download.sh download.sh
+          pushd Moddex-Frontend
+          npm run build -- --configuration production
+          popd
+
+      - name: Build deployment bundle
+        env:
+          VERSION: ${{ env.TARGET_REF }}
+        run: |
+          chmod +x Moddex-build/scripts/build-bundle.sh
+          VERSION=${{ env.TARGET_REF }} Moddex-build/scripts/build-bundle.sh
+
+      - name: Prepare release artifacts
+        run: |
+          cp Moddex-build/build/moddex-${TARGET_REF}-linux-amd64.tar.gz .
+          cp Moddex-build/build/moddex-${TARGET_REF}-linux-amd64.tar.gz.sha256 .
+          cp Moddex-build/scripts/download.sh download.sh
           sha256sum download.sh > download.sh.sha256
 
       # 10) Create release and upload assets
@@ -115,5 +99,4 @@ jobs:
             moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz.sha256
             download.sh
             download.sh.sha256
-
 
