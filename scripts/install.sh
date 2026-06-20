@@ -176,6 +176,7 @@ printf 'Systemd unit: moddex-backend.service\n'
 if [[ -n "$FRONTEND_DIR" ]]; then
   printf 'Static frontend copied to /var/lib/moddex/ui (serve separately).\n'
 fi
-printf 'Authentication is disabled. Protect the service via network policies if exposed.\n'
+printf 'Complete the first-run setup in the web UI to set an admin password; the API requires authentication afterwards.\n'
+printf 'For anything beyond localhost/trusted LAN, put Moddex behind a reverse proxy with TLS. See the "Private Linux Operation" section in the README.\n'
 
 exit 0

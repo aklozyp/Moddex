@@ -91,7 +91,7 @@ This section is aimed at private administrators who want to run Moddex securely 
 | `lan` | `0.0.0.0` | **Empfohlen** für privaten Betrieb im Heimnetz (Router nicht exponiert) |
 | `public` | `0.0.0.0` | Nur hinter Reverse Proxy mit TLS – niemals direkt ins Internet |
 
-**Anti-Pattern:** Den Modus `public` ohne vorgeschalteten Reverse Proxy und TLS verwenden. Moddex liefert keinen TLS-Terminator und hat aktuell keine eingebaute Authentifizierung.
+**Anti-Pattern:** Den Modus `public` ohne vorgeschalteten Reverse Proxy und TLS verwenden. Moddex liefert keinen TLS-Terminator; die eingebaute Authentifizierung allein ersetzt keine TLS-Verschlüsselung für öffentlich erreichbare Instanzen.
 
 ### Linux-Benutzer, Dienst-Rechte und Datenpfade
 
@@ -115,15 +115,19 @@ Der Dienst läuft niemals als `root`. Die Dateien unter `/opt/moddex` und `/var/
 
 ### Authentifizierung
 
-> **Wichtig:** Moddex hat aktuell **keine eingebaute Authentifizierung**. Jede Person, die den Port erreichen kann, hat vollen Zugriff auf die Benutzeroberfläche.
+Moddex besitzt eine **eingebaute Authentifizierung**: Beim ersten Start legst du über den Setup-Assistenten ein Admin-Passwort fest (BCrypt-Hash, persistiert in den Server-Einstellungen). Die Weboberfläche meldet sich anschließend per Login an und sendet ein **JWT-Bearer-Token** an die API. Serverseitig sind alle API-Endpunkte geschützt; nur die Setup- und Login-Endpunkte (`/api/v1/setup/**`, `/api/v1/auth/**`) sowie `/error` sind ohne Token erreichbar.
+
+> **Wichtig:** Schließe das Erst-Setup sofort ab und vergib ein starkes Admin-Passwort. Solange das Setup nicht abgeschlossen ist, ist die Installation ungeschützt.
 
 Sichere Defaults für den Privatbetrieb:
 
 - **`local`-Modus:** Zugriff nur vom selben Rechner – kein Firewall-Risiko.
 - **`lan`-Modus:** Nur im eigenen Heimnetz exponieren. Sicherstellen, dass der Router den Port **nicht** an das Internet weiterleitet (Port-Forwarding deaktiviert).
-- **`public`-Modus:** Immer einen Reverse Proxy mit Authentifizierung (z. B. HTTP Basic Auth über nginx oder Caddy) vorschalten.
+- **`public`-Modus:** Zusätzlich zur eingebauten Auth einen Reverse Proxy mit TLS (und optional einer weiteren Schutzschicht wie HTTP Basic Auth) vorschalten. Verlasse dich nie allein auf die App-Auth, wenn der Dienst öffentlich erreichbar ist.
 
-Passwörter und Tokens werden nicht vom Installer verwaltet; sie entstehen aus der laufenden Anwendung heraus. Keine Zugangsdaten in der `moddex-backend.service`-Datei ablegen.
+Passwörter und Tokens werden **nicht** vom Installer verwaltet; sie entstehen aus der laufenden Anwendung heraus. Hinterlege keine Zugangsdaten in der `moddex-backend.service`-Datei.
+
+> **Anti-Pattern:** Die CORS-Konfiguration des Backends erlaubt im Auslieferungszustand alle Ursprünge (`allowedOrigins = "*"`). Für öffentlichen Betrieb sollte der Reverse Proxy die erlaubten Ursprünge einschränken bzw. den Zugriff zusätzlich absichern.
 
 ### Firewall (UFW / firewalld)
 
@@ -206,9 +210,9 @@ Die folgenden Funktionen sind noch in der Entwicklung. Sie können unerwartet fe
 | Funktion | Status | Hinweis |
 |----------|--------|---------|
 | **Restore / Wiederherstellung** | Experimentell | Kann bestehende Daten überschreiben; vorher Backup erstellen |
-| **Modpack Import** | Experimentell | Externe Quellen werden nicht kryptografisch verifiziert |
-| **File Manager** | Experimentell | Schreibzugriff auf das Dateisystem des Servers; Berechtigungen prüfen |
-| **Externe Downloads** | Experimentell | URLs werden zum Zeitpunkt des Abrufs nicht auf Schadsoftware geprüft |
+| **Modpack Import** | Experimentell | Importe werden gegen eine Trust-Policy (erlaubte Hosts/Endungen, Größenlimits, Prüfsummen) validiert; importiere dennoch nur Modpacks vertrauenswürdiger Autoren |
+| **File Manager** | Experimentell | Schreibzugriff auf das Dateisystem des Servers; an die Instanz-Wurzel gebunden, Berechtigungen trotzdem prüfen |
+| **Externe Downloads** | Experimentell | Downloads laufen nur über erlaubte HTTPS-Hosts und werden gegen erwartete SHA-512/SHA-1-Prüfsummen verifiziert; eine Malware-Prüfung des Inhalts findet nicht statt |
 
 Für produktive oder sicherheitskritische Umgebungen diese Funktionen deaktiviert lassen, bis sie als stabil markiert sind.
 
