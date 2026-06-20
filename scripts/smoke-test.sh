@@ -62,12 +62,22 @@ require_instance() {
 
 log "Target: $BASE_URL"
 
-# --- 1. Reachability (no auth required) ---
-status=$(http_status GET /api/v1/setup/status)
-if [[ "$status" == "200" ]]; then
-  ok "backend reachable (/setup/status -> 200)"
+# --- 1. Reachability ---
+# Any HTTP response (even 401/404) proves the backend is up. Probe a couple of
+# known routes and treat status 000 (no response) as unreachable, so the check
+# does not depend on one specific endpoint being present in a given build.
+reach_status=""
+for probe in /api/v1/setup/status /api/v1/instance; do
+  code=$(http_status GET "$probe")
+  if [[ "$code" != "000" ]]; then
+    reach_status="$probe -> $code"
+    break
+  fi
+done
+if [[ -n "$reach_status" ]]; then
+  ok "backend reachable ($reach_status)"
 else
-  bad "backend not reachable (/setup/status -> $status)"
+  bad "backend not reachable (no HTTP response)"
   log "Aborting: backend unreachable."
   exit 1
 fi
