@@ -242,3 +242,20 @@ ls Moddex-build/build
 
 The script requires Java 17+, Node.js 20+, Maven (via the wrapper), npm, and `tar`. It produces a
 standalone bundle identical to the release assets, ready to be installed via `scripts/install.sh`.
+
+## Quality assurance
+
+Before each release, run the recovery QA pass to make sure restore, mod changes
+and file operations cannot silently destroy instances:
+
+- **Manual matrix:** [`docs/qa/recovery-checklist.md`](docs/qa/recovery-checklist.md)
+  — versioned checklist covering backup → restore → start, mod-install rollback,
+  broken modpacks, full-disk/aborted-download scenarios and a fresh-install smoke
+  test. Steps marked 🚫 are Public-Beta blockers.
+- **Automated smoke test:** [`scripts/smoke-test.sh`](scripts/smoke-test.sh) —
+  exercises the backup/restore and mod endpoints against a running backend:
+
+  ```bash
+  BASE_URL=http://127.0.0.1:8080 TOKEN=<jwt> INSTANCE_ID=<uuid> \
+    scripts/smoke-test.sh            # add --with-restore for the destructive restore step
+  ```
