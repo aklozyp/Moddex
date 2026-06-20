@@ -115,9 +115,11 @@ Der Dienst läuft niemals als `root`. Die Dateien unter `/opt/moddex` und `/var/
 
 ### Authentifizierung
 
-Moddex besitzt eine **eingebaute Authentifizierung**: Beim ersten Start legst du über den Setup-Assistenten ein Admin-Passwort fest (BCrypt-Hash, persistiert in den Server-Einstellungen). Die Weboberfläche meldet sich anschließend per Login an und sendet ein **JWT-Bearer-Token** an die API. Serverseitig sind alle API-Endpunkte geschützt; nur die Setup- und Login-Endpunkte (`/api/v1/setup/**`, `/api/v1/auth/**`) sowie `/error` sind ohne Token erreichbar.
+> **Grundregel (Defense in Depth):** Behandle den Moddex-Port immer als schützenswert und verlasse dich **nicht allein** auf die App-Authentifizierung. Begrenze den Zugriff zuerst über Netzwerkmittel (Bind-Adresse, Firewall, Router, Reverse Proxy) und setze die eingebaute Auth als zusätzliche Schicht obendrauf.
 
-> **Wichtig:** Schließe das Erst-Setup sofort ab und vergib ein starkes Admin-Passwort. Solange das Setup nicht abgeschlossen ist, ist die Installation ungeschützt.
+Moddex bringt eine **eingebaute Authentifizierung** mit (bereitgestellt von der Backend-Komponente, nicht vom Installer): Beim ersten Start legst du über den Setup-Assistenten ein Admin-Passwort fest (BCrypt-Hash, persistiert in den Server-Einstellungen). Die Weboberfläche meldet sich anschließend per Login an und sendet ein **JWT-Bearer-Token** an die API. Serverseitig sind die API-Endpunkte geschützt; nur die Setup- und Login-Endpunkte (`/api/v1/setup/**`, `/api/v1/auth/**`) sowie `/error` sind ohne Token erreichbar.
+
+> **Wichtig:** Schließe das Erst-Setup sofort ab und vergib ein starkes Admin-Passwort. Solange das Setup nicht abgeschlossen ist, ist die Oberfläche ungeschützt. Prüfe nach der Installation aktiv, dass ein nicht authentifizierter Aufruf eines geschützten Endpunkts (z. B. `curl -i http://127.0.0.1:8080/api/v1/instance`) mit `401 Unauthorized` beantwortet wird, bevor du den Dienst über `localhost` hinaus erreichbar machst.
 
 Sichere Defaults für den Privatbetrieb:
 

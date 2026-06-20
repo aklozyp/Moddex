@@ -176,7 +176,8 @@ printf 'Systemd unit: moddex-backend.service\n'
 if [[ -n "$FRONTEND_DIR" ]]; then
   printf 'Static frontend copied to /var/lib/moddex/ui (serve separately).\n'
 fi
-printf 'Complete the first-run setup in the web UI to set an admin password; the API requires authentication afterwards.\n'
-printf 'For anything beyond localhost/trusted LAN, put Moddex behind a reverse proxy with TLS. See the "Private Linux Operation" section in the README.\n'
+printf 'Complete the first-run setup in the web UI to set an admin password. Then verify a protected endpoint returns 401 without a token, e.g.:\n'
+printf '  curl -i http://127.0.0.1:%s/api/v1/instance\n' "$SERVER_PORT"
+printf 'Do not rely on app auth alone: restrict access via firewall/router and put Moddex behind a reverse proxy with TLS beyond localhost/trusted LAN. See "Private Linux Operation" in the README.\n'
 
 exit 0
