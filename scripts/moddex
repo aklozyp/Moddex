@@ -57,27 +57,40 @@ load_env() {
         port="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_PORT:-}")"
         [[ -z "${SERVER_ADDRESS:-}" && -n "$addr" ]] && SERVER_ADDRESS="$addr"
         [[ -z "${SERVER_PORT:-}" && -n "$port" ]] && SERVER_PORT="$port"
-    elif [[ -e "$ENV_FILE" && -z "${SERVER_ADDRESS:-}" && -z "${SERVER_PORT:-}" ]]; then
-        # The file exists but this user cannot read it (it is 0640 root:moddex).
-        # Warn instead of silently contacting the wrong endpoint on custom-port
-        # installs; root or members of the 'moddex' group get the real values.
-        err "warning: $ENV_FILE is not readable by this user; falling back to ${SERVER_ADDRESS:-127.0.0.1}:${SERVER_PORT:-8080}."
+    elif [[ -z "${SERVER_ADDRESS:-}" && -z "${SERVER_PORT:-}" && ( -e "$ENV_FILE" || -d "$CONFIG_DIR" ) ]]; then
+        # An install is present ($CONFIG_DIR exists) but this user cannot read the
+        # config: the file is 0640 root:moddex inside a 0750 root:moddex dir, so a
+        # non-root user outside the 'moddex' group can neither read nor even
+        # traverse to it (then -e is false too). Warn instead of silently
+        # contacting the wrong endpoint on custom-address/port installs.
+        err "warning: cannot read $ENV_FILE ($CONFIG_DIR may be inaccessible to this user); falling back to ${SERVER_ADDRESS:-127.0.0.1}:${SERVER_PORT:-8080}."
         err "         Run via sudo, join the 'moddex' group, or set SERVER_ADDRESS/SERVER_PORT to target the configured endpoint."
     fi
     SERVER_PORT="${SERVER_PORT:-8080}"
     SERVER_ADDRESS="${SERVER_ADDRESS:-127.0.0.1}"
 }
 
-# Base URL for API calls. A wildcard bind (0.0.0.0 / ::) is not connectable, so
-# the CLI always talks to loopback from the same host.
-base_url() {
+# Resolve the API base URL once, in the parent shell. base_url() is used inside
+# many $(...) command substitutions, each of which runs in a subshell where a
+# memoization flag would not persist; doing the work here keeps load_env (and its
+# one-time warning) to a single execution. A wildcard bind (0.0.0.0 / ::) is not
+# connectable, so the CLI always talks to loopback from the same host.
+BASE_URL=""
+CONN_INIT=0
+init_connection() {
+    [[ "$CONN_INIT" -eq 1 ]] && return 0
+    CONN_INIT=1
     load_env
     local host="$SERVER_ADDRESS"
     case "$host" in
         0.0.0.0|""|"::"|"[::]") host="127.0.0.1" ;;
     esac
-    printf 'http://%s:%s' "$host" "$SERVER_PORT"
+    BASE_URL="http://${host}:${SERVER_PORT}"
 }
+
+# Emits the resolved base URL. Callers must have run init_connection first
+# (every network command does); kept as a function so $(base_url) reads naturally.
+base_url() { printf '%s' "$BASE_URL"; }
 
 # ---------------------------------------------------------------------------
 # HTTP helpers
@@ -106,6 +119,7 @@ TOKEN="${MODDEX_API_TOKEN:-}"
 #   3. interactive password prompt -> login
 ensure_token() {
     need_cmd curl
+    init_connection
     [[ -n "$TOKEN" ]] && return 0
 
     local password="${MODDEX_ADMIN_PASSWORD:-}"
@@ -204,6 +218,7 @@ service_action() {
 
 cmd_status() {
     need_cmd systemctl
+    init_connection
     local active enabled
     active="$(systemctl is-active "$SERVICE" 2>/dev/null || true)"
     enabled="$(systemctl is-enabled "$SERVICE" 2>/dev/null || true)"
@@ -247,6 +262,7 @@ cmd_version() {
 }
 
 cmd_list_instances() {
+    init_connection
     ensure_token
     local out status body
     out="$(http_body_status GET /api/v1/instance -H "$(auth_header)")"
