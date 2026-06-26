@@ -1,6 +1,56 @@
 # Moddex
 
-> **Note:** This project is under active development. Features may be missing and defects can occur.
+> **Note:** This project is under active development (v0.2, Public-Beta-Foundation). Features may be missing and defects can occur.
+
+Moddex is a self-hosted **Minecraft server panel and modpack/instance manager**.
+It installs natively on Linux as a systemd service, gives you a web UI plus a
+terminal CLI to create and run server instances, manage mods from
+[Modrinth](https://modrinth.com), edit `server.properties` and player access,
+take backups, and watch a live console and metrics dashboard.
+
+**Who it is for:** private administrators running one or more Minecraft servers
+on their own Debian/Ubuntu host or home server, who want a manageable panel
+without renting a hosted control panel — and without Docker. Moddex runs as a
+single-user, self-hosted application; it is built to be safe on a trusted LAN
+and hardenable for restricted public exposure behind a reverse proxy.
+
+**Not a hosting product:** there is no multi-tenant SaaS, no built-in TLS
+terminator and no managed cloud. You own the host and the data.
+
+## Feature matrix
+
+Status of the major capabilities per milestone. v0.2 is the current
+Public-Beta-Foundation; v0.3/v0.4 are planned (see the
+[issue tracker](https://github.com/aklozyp/Moddex/issues) for the live roadmap).
+
+| Area | Capability | v0.2 | v0.3 | v0.4 |
+|------|------------|:----:|:----:|:----:|
+| Platform | Native Debian/Ubuntu install (systemd, CLI) | ✅ | ✅ | ✅ |
+| Platform | Arch Linux | 🧪 | 🧪 | ✅ |
+| Platform | Windows installer | — | ✅ | ✅ |
+| Instances | Create/start/stop, crash detection & auto-restart | ✅ | ✅ | ✅ |
+| Instances | Live console (WebSocket) & metrics dashboard | ✅ | ✅ | ✅ |
+| Mods | Modrinth install/update, modpack import/export (`.mrpack`) | ✅ | ✅ | ✅ |
+| Mods | CurseForge integration (user API key) | — | ✅ | ✅ |
+| Backups | `.moddex` archive, restore, retention, scheduler | ✅ | ✅ | ✅ |
+| Server config | `server.properties` schema, whitelist/ops/bans, MOTD | ✅ | ✅ | ✅ |
+| Files | Hardened file manager (upload/download/rename) | ✅ | ✅ | ✅ |
+| Notifications | Discord webhooks (crash/backup/update) | ✅ | ✅ | ✅ |
+| Security | Single-user auth, CORS/audit, quota, sandbox | ✅ | ✅ | ✅ |
+| i18n | DE/EN (+ RTL groundwork) | ✅ | — | — |
+| i18n | Full 7-language coverage | — | ✅ | ✅ |
+| Release | Release-ready checklist for external admins | — | — | ✅ |
+
+Legend: ✅ available · 🧪 experimental/unvalidated · — not yet / out of scope.
+
+## Supported platforms
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| Debian 12 / Ubuntu 22.04+ | **Supported** | Primary target; native installer + systemd. |
+| Arch Linux | **Experimental** | Expected to work (systemd, OpenJDK 17+) but not validated in CI. |
+| Windows | Planned (v0.3) | Installer is a v0.3 target ([#26](https://github.com/aklozyp/Moddex/issues/26)); not a v0.2 blocker. |
+| Docker | Dev utility only | The `Docker/` files in the meta repo are for local development. Docker is **not** the supported production deployment path — install natively per below. |
 
 ## Installation
 
@@ -236,15 +286,54 @@ Für Caddy ist `reverse_proxy localhost:8080` mit automatischem TLS über Let's 
 
 ### Backup
 
-Alle persistenten Daten liegen unter `/var/lib/moddex`. Für ein konsistentes Backup den Dienst kurz stoppen:
+Moddex hat **integrierte Instanz-Backups** (Web-UI und CLI). Pro Instanz wird ein
+portables `.moddex`-Archiv erzeugt:
+
+- **Typen:** `STANDARD` (Welten inkl. `level-name`, `config/`, `server.properties`)
+  und `FULL` (gesamte Instanz).
+- **Format:** ZIP mit `moddex-manifest.json` und den Daten unter `data/`; beim
+  Restore werden Manifest/ZIP validiert (korrupt/fremd → Abbruch), Zip-Slip-Pfade
+  abgewiesen und vor dem Extrahieren ein Snapshot-Rollback vorbereitet.
+- **Retention** global oder pro Instanz; optionaler **Scheduler** (Uhrzeit/Wochentage).
+
+```bash
+# Per CLI (siehe Abschnitt "Command-line interface"):
+moddex backup  <instance-id> --type full
+moddex restore <instance-id> <backup-name>     # destruktiv, fragt nach Bestätigung
+```
+
+> **Restore ist destruktiv** und überschreibt den aktuellen Instanzstand. Erstelle
+> vorher ein Backup; siehe auch „Experimentelle Funktionen".
+
+Für ein **vollständiges Host-Backup** (alle Instanzen, Einstellungen, Konfiguration)
+zusätzlich `/var/lib/moddex` und `/etc/moddex` sichern – für Konsistenz den Dienst
+kurz stoppen:
 
 ```bash
 sudo systemctl stop moddex-backend
-sudo tar -czf moddex-backup-$(date +%Y%m%d).tar.gz /var/lib/moddex
+sudo tar -czf moddex-backup-$(date +%Y%m%d).tar.gz /var/lib/moddex /etc/moddex
 sudo systemctl start moddex-backend
 ```
 
 Die Anwendungsdatei `/opt/moddex/app.jar` muss nicht gesichert werden – sie wird bei Updates ersetzt.
+
+### Mod-Verwaltung (Modrinth)
+
+Mods und Modpacks werden über [Modrinth](https://modrinth.com) verwaltet:
+
+- **Mods** suchen, installieren und entfernen; Dependencies werden aufgelöst,
+  client-only Mods werden nicht auf den Server gespielt.
+- **Updates:** pro Mod wird die neueste **kompatible** Version ermittelt (gefiltert
+  nach Loader + MC-Version); einzeln oder als Batch aktualisierbar. Vor riskanten
+  Änderungen wird automatisch ein Pre-Update-Backup erstellt.
+- **Modpacks:** Import/Export im `.mrpack`-Format. Importe werden gegen eine
+  Trust-Policy (erlaubte Hosts/Endungen, Größenlimits, Prüfsummen) validiert.
+- **Versionierung:** Modpack-Änderungen werden versioniert (mit Cooldown-Fenster),
+  inklusive Verknüpfung zum jeweiligen Pre-Update-Backup.
+
+> **CurseForge** ist ein **v0.3-Ziel**
+> ([#25](https://github.com/aklozyp/Moddex/issues/25)): geplant mit nutzereigenem
+> API-Key, ohne die v0.2-Modrinth-UX zu beeinträchtigen. In v0.2 nicht verfügbar.
 
 ### Experimentelle Funktionen
 
@@ -335,3 +424,26 @@ sudo cat /etc/moddex/moddex.env       # unchanged
 Acceptance: after the installer the service is running under systemd and the web UI is
 reachable; a second installer run upgrades the artifacts without overwriting
 `/etc/moddex/moddex.env` or any instance data under `/var/lib/moddex`.
+
+## Contributing
+
+Issues and pull requests are welcome. Backend (Kotlin/Spring Boot) and frontend
+(Angular) changes target the `tests` branch of their respective repositories;
+packaging/docs changes here target `develop`.
+
+### Translations
+
+Moddex ships German and English (`de`/`en`) with groundwork for right-to-left
+layouts; full 7-language coverage is a v0.3 goal
+([#27](https://github.com/aklozyp/Moddex/issues/27)). UI strings live in the
+frontend under `src/assets/i18n/<lang>.json`. To contribute a translation:
+
+1. Copy `en.json` to your language code (e.g. `fr.json`) and translate the values
+   (keep the keys unchanged).
+2. Register the language in the frontend language registry so the switcher offers
+   it (English is always the fallback for missing keys).
+3. An i18n parity check (`i18n-parity.spec.ts`) fails the build if a key exists in
+   one language but not the other — run the frontend tests before submitting.
+
+A dedicated translation contribution guide is tracked in
+[#23](https://github.com/aklozyp/Moddex/issues/23).
