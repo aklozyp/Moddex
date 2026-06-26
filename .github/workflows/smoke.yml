@@ -1,0 +1,98 @@
+name: smoke
+
+# Manual pre-release smoke test. Builds and boots the backend on loopback with a
+# throwaway data directory, then runs scripts/release-smoke-test.sh against it.
+# See docs/qa/release-checklist.md.
+#
+# Cross-repo checkout: Moddex-Backend is private, so set MODDEX_CHECKOUT_TOKEN
+# (see docs/ci.md). By default the instance-create + backup steps are skipped
+# (no network download); set the `full` input to true to include them.
+
+on:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 'Also run the instance-create + backup steps (downloads a server JAR)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: moddex-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-22.04
+    env:
+      CHECKOUT_TOKEN: ${{ secrets.MODDEX_CHECKOUT_TOKEN || github.token }}
+      ADMIN_PASSWORD: Smoke-${{ github.run_id }}-Aa1
+      SERVER_ADDRESS: 127.0.0.1
+      SERVER_PORT: '8080'
+
+    steps:
+      - name: Checkout packaging repo (Moddex-build)
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-build
+
+      - name: Checkout backend repo
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Backend
+          ref: tests
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-Backend
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build backend JAR
+        run: |
+          chmod +x Moddex-Backend/mvnw
+          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pprod -DskipTests clean package
+
+      - name: Boot backend on loopback
+        env:
+          MODDEX_ROOT: ${{ runner.temp }}/moddex-data
+          MODDEX_CONFIG_DIR: ${{ runner.temp }}/moddex-cfg
+          MODDEX_LOG_DIR: ${{ runner.temp }}/moddex-log
+          MODDEX_SECURITY_MODE: local
+        run: |
+          mkdir -p "$MODDEX_ROOT" "$MODDEX_CONFIG_DIR" "$MODDEX_LOG_DIR"
+          jar="$(find Moddex-Backend/target -maxdepth 1 -name 'Moddex-Backend-*.jar' | head -n1)"
+          [ -n "$jar" ] || { echo "backend JAR not found" >&2; exit 1; }
+          nohup java -jar "$jar" > "$MODDEX_LOG_DIR/boot.log" 2>&1 &
+          echo $! > backend.pid
+          echo "Waiting for backend readiness..."
+          for i in $(seq 1 60); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "http://${SERVER_ADDRESS}:${SERVER_PORT}/api/v1/setup/status" || true)"
+            if [ "$code" != "000" ] && [ -n "$code" ]; then echo "ready (HTTP $code) after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "backend did not become ready in time" >&2
+          tail -n 100 "$MODDEX_LOG_DIR/boot.log" >&2 || true
+          exit 1
+
+      - name: Run release smoke test
+        env:
+          BASE_URL: http://127.0.0.1:8080
+          MODDEX_ADMIN_PASSWORD: ${{ env.ADMIN_PASSWORD }}
+        run: |
+          chmod +x Moddex-build/scripts/release-smoke-test.sh
+          if [ "${{ inputs.full }}" = "true" ]; then
+            Moddex-build/scripts/release-smoke-test.sh
+          else
+            Moddex-build/scripts/release-smoke-test.sh --skip-instance
+          fi
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f backend.pid ]; then kill "$(cat backend.pid)" 2>/dev/null || true; fi

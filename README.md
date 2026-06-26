@@ -393,6 +393,16 @@ and file operations cannot silently destroy instances:
   BASE_URL=http://127.0.0.1:8080 TOKEN=<jwt> INSTANCE_ID=<uuid> \
     scripts/smoke-test.sh            # add --with-restore for the destructive restore step
   ```
+- **Release smoke test:** [`scripts/release-smoke-test.sh`](scripts/release-smoke-test.sh)
+  and the [release checklist](docs/qa/release-checklist.md) — the v0.2 release
+  gate covering install → setup → login → create instance → backup → service
+  health, with stable exit codes. A manual `smoke.yml` GitHub Actions job boots a
+  throwaway backend and runs it:
+
+  ```bash
+  MODDEX_ADMIN_PASSWORD='<strong-password>' scripts/release-smoke-test.sh
+  # add --skip-instance for an offline run (no server-JAR download)
+  ```
 
 ### Debian/Ubuntu install smoke test
 
