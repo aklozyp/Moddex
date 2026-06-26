@@ -79,9 +79,25 @@ json_field() {  # json_field <key>  (reads stdin; first matching string value)
   fi
 }
 
+# Quote an arbitrary string as a JSON string literal so passwords containing
+# " \ newlines or other JSON-significant characters never produce an invalid
+# request body. Uses jq or python3 (both encode every case correctly); one of
+# them is required as a precondition (checked below) so we never fall back to a
+# lossy hand-rolled escape.
+json_string() {
+  if command -v jq >/dev/null 2>&1; then
+    printf '%s' "$1" | jq -Rs .
+  else
+    MODDEX_JSON_IN="$1" python3 -c 'import json,os; print(json.dumps(os.environ["MODDEX_JSON_IN"]))'
+  fi
+}
+
 auth_header() { printf 'Authorization: Bearer %s' "$TOKEN"; }
 
 command -v curl >/dev/null 2>&1 || { echo "curl is required" >&2; exit 2; }
+# A JSON encoder is required so passwords with special characters are sent safely.
+command -v jq >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1 || {
+  echo "jq or python3 is required (to safely JSON-encode the admin password)" >&2; exit 2; }
 
 log "Target: $BASE_URL"
 
@@ -99,15 +115,19 @@ fi
 status_body=$(http_body_status GET /api/v1/setup/status)
 setup_required=$(printf '%s' "${status_body%$'\n'*}" | grep -o '"setupRequired"[^,}]*' | grep -o 'true\|false' | head -n1)
 if [[ "$setup_required" == "true" ]]; then
-  complete=$(printf '{"password":"%s"}' "$ADMIN_PASSWORD" \
+  complete=$(printf '{"password":%s}' "$(json_string "$ADMIN_PASSWORD")" \
     | http_status POST /api/v1/setup/complete -H 'Content-Type: application/json' --data @-)
   if [[ "$complete" == "200" ]]; then
     ok "first-run setup completed (POST /setup/complete -> 200)"
   else
     bad "first-run setup failed (POST /setup/complete -> $complete)"
   fi
-else
+elif [[ "$setup_required" == "false" ]]; then
   ok "setup already completed (using provided admin password for login)"
+else
+  # Could not read setupRequired — the endpoint is broken or changed shape.
+  # Do not silently pass; the checklist requires a valid setup-status response.
+  bad "could not parse /setup/status response (setupRequired missing/unrecognized)"
 fi
 
 # --- 3. Auth enforcement ---------------------------------------------------
@@ -119,7 +139,7 @@ else
 fi
 
 # --- 4. Login --------------------------------------------------------------
-login_out=$(printf '{"password":"%s"}' "$ADMIN_PASSWORD" \
+login_out=$(printf '{"password":%s}' "$(json_string "$ADMIN_PASSWORD")" \
   | http_body_status POST /api/v1/auth/login -H 'Content-Type: application/json' --data @-)
 login_code="${login_out##*$'\n'}"
 TOKEN=$(printf '%s' "${login_out%$'\n'*}" | json_field token)

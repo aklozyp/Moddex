@@ -16,6 +16,11 @@ on:
         required: false
         default: false
         type: boolean
+      backend_ref:
+        description: 'Moddex-Backend ref to build & test (branch, tag or SHA). Set to the release candidate when gating a release.'
+        required: false
+        default: tests
+        type: string
 
 concurrency:
   group: moddex-smoke-${{ github.ref }}
@@ -42,7 +47,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: aklozyp/Moddex-Backend
-          ref: tests
+          ref: ${{ inputs.backend_ref }}
           token: ${{ env.CHECKOUT_TOKEN }}
           path: Moddex-Backend
 

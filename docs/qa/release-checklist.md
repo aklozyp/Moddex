@@ -38,6 +38,9 @@ test on the target host.
 
 ## Running the automated smoke test
 
+Prerequisites on the machine running the script: `curl` and a JSON encoder
+(`jq` **or** `python3`, used to safely encode the admin password).
+
 Against a running backend (defaults to `http://127.0.0.1:8080`):
 
 ```bash
