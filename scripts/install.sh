@@ -230,6 +230,9 @@ write_env_file() {
 # The installer rewrites this file only when --mode/--port (or MODDEX_MODE/
 # MODDEX_PORT) are given explicitly; plain upgrades leave it untouched.
 MODDEX_MODE=$MODE
+# Drives the backend's CORS/security policy (moddex.security.mode); must match
+# MODDEX_MODE so a lan/public install does not run with the local default.
+MODDEX_SECURITY_MODE=$MODE
 MODDEX_ROOT=$DATA_DIR
 MODDEX_CONFIG_DIR=$CONFIG_DIR
 MODDEX_LOG_DIR=$LOG_DIR
