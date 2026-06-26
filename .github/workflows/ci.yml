@@ -1,0 +1,104 @@
+name: ci
+
+# Build validation for the Moddex distribution. Runs the backend tests + package
+# and the frontend tests + production build across a Debian/Ubuntu-compatible
+# runner matrix, then assembles the deployment bundle so the whole release
+# pipeline is exercised on every change. The job fails on any backend or
+# frontend build/test error (acceptance criterion of #21).
+#
+# Cross-repo checkout: Moddex-Backend and Moddex-Frontend are private, so set the
+# MODDEX_CHECKOUT_TOKEN secret to a token with read access to all three repos
+# (see docs/ci.md). Without it the private checkouts fail with a clear error.
+#
+# Target matrix: ubuntu-22.04 and ubuntu-24.04 cover the glibc range of the
+# supported Debian/Ubuntu targets. Arch Linux has no GitHub-hosted runner and is
+# treated as experimental (documented in docs/ci.md). Windows packaging is a
+# v0.3 target (epic #26) and intentionally does not gate v0.2.
+
+on:
+  push:
+    branches: [develop, tests, main]
+  pull_request:
+    branches: [develop, tests, main]
+  workflow_dispatch:
+
+concurrency:
+  group: moddex-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    env:
+      CHECKOUT_TOKEN: ${{ secrets.MODDEX_CHECKOUT_TOKEN || github.token }}
+      # Plain version label for validation artifacts (not a release tag).
+      VERSION: ci-${{ github.run_number }}-${{ matrix.os }}
+
+    steps:
+      - name: Checkout packaging repo (Moddex-build)
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-build
+
+      - name: Checkout backend repo
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Backend
+          ref: tests
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-Backend
+
+      - name: Checkout frontend repo
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Frontend
+          ref: tests
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-Frontend
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'Moddex-Frontend/package-lock.json'
+
+      - name: Backend tests
+        run: |
+          chmod +x Moddex-Backend/mvnw
+          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pci test
+
+      - name: Frontend install
+        run: npm --prefix Moddex-Frontend ci
+
+      - name: Frontend tests (headless)
+        run: npm --prefix Moddex-Frontend run test -- --watch=false --browsers=ChromeHeadless
+
+      - name: Assemble deployment bundle
+        run: |
+          chmod +x Moddex-build/scripts/build-bundle.sh
+          Moddex-build/scripts/build-bundle.sh
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: moddex-bundle-${{ matrix.os }}
+          path: |
+            Moddex-build/build/moddex-*-linux-amd64.tar.gz
+            Moddex-build/build/moddex-*-linux-amd64.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 14

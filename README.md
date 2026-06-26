@@ -284,6 +284,10 @@ ls Moddex-build/build
 The script requires Java 17+, Node.js 20+, Maven (via the wrapper), npm, and `tar`. It produces a
 standalone bundle identical to the release assets, ready to be installed via `scripts/install.sh`.
 
+The same bundle is built in CI and on tags by GitHub Actions. See
+[`docs/ci.md`](docs/ci.md) for the build matrix, the required cross-repo
+checkout secret, the release process and the Arch/Windows status.
+
 ## Quality assurance
 
 Before each release, run the recovery QA pass to make sure restore, mod changes

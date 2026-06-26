@@ -1,5 +1,19 @@
 name: release
 
+# Tag-driven release pipeline. Builds the backend JAR and the frontend bundle
+# from the three Moddex repositories, assembles the installable Linux artifact
+# with a SHA256 checksum and publishes a GitHub Release.
+#
+# Cross-repo checkout: aklozyp/Moddex is public, but Moddex-Backend and
+# Moddex-Frontend are private, so the default GITHUB_TOKEN cannot read them. Set
+# a repository/organization secret MODDEX_CHECKOUT_TOKEN to a PAT (or a fine
+# grained token) with read access to all three repos. See docs/ci.md.
+#
+# All three repositories must carry the release tag (or pass an explicit ref via
+# workflow_dispatch). The release runs on a single pinned runner (ubuntu-22.04)
+# so the produced artifact links against the oldest still-supported glibc and
+# therefore runs on the broadest range of Debian/Ubuntu targets.
+
 on:
   push:
     tags:
@@ -7,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag (e.g. v0.1.0) that will be checked out in all repos for the release'
+        description: 'Tag (e.g. v0.1.0) checked out in all three repos for the release'
         required: true
         type: string
 
@@ -22,15 +36,36 @@ jobs:
       contents: write   # required for release upload
     env:
       TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+      CHECKOUT_TOKEN: ${{ secrets.MODDEX_CHECKOUT_TOKEN || github.token }}
 
     steps:
-      # 1) Checkout this packaging repo
-      - name: Checkout repository
+      # Check out the three repositories into the sibling layout that
+      # build-bundle.sh expects (REPO_ROOT/{Moddex-build,Moddex-Backend,Moddex-Frontend}).
+      - name: Checkout packaging repo (Moddex-build)
         uses: actions/checkout@v4
         with:
+          repository: aklozyp/Moddex
+          ref: ${{ env.TARGET_REF }}
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-build
           fetch-depth: 0
 
-      # 4) Java 21 + Maven cache
+      - name: Checkout backend repo
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Backend
+          ref: ${{ env.TARGET_REF }}
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-Backend
+
+      - name: Checkout frontend repo
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Frontend
+          ref: ${{ env.TARGET_REF }}
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-Frontend
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -38,17 +73,6 @@ jobs:
           java-version: '21'
           cache: maven
 
-      # 5) Build backend (via mvnw in backend folder)
-      - name: Run backend tests
-        run: |
-          chmod +x Moddex-Backend/mvnw
-          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pci test
-
-      - name: Build backend JAR
-        run: |
-          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pprod -DskipTests clean package
-
-      # 6) Node 20 + npm cache
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -56,40 +80,30 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'Moddex-Frontend/package-lock.json'
 
-      # 7) Build frontend dist
-      - name: Install frontend dependencies
+      # Fast confidence check before producing a release artifact. The full test
+      # matrix runs in ci.yml; here we re-run the no-network backend tests only.
+      - name: Run backend tests
         run: |
-          pushd Moddex-Frontend
-          npm ci
-          popd
-
-      - name: Run frontend tests
-        run: |
-          pushd Moddex-Frontend
-          npm run test -- --watch=false --browsers=ChromeHeadless
-          popd
-
-      - name: Build frontend dist
-        run: |
-          pushd Moddex-Frontend
-          npm run build -- --configuration production
-          popd
+          chmod +x Moddex-Backend/mvnw
+          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pci test
 
       - name: Build deployment bundle
         env:
           VERSION: ${{ env.TARGET_REF }}
         run: |
           chmod +x Moddex-build/scripts/build-bundle.sh
-          VERSION=${{ env.TARGET_REF }} Moddex-build/scripts/build-bundle.sh
+          Moddex-build/scripts/build-bundle.sh
 
       - name: Prepare release artifacts
         run: |
-          cp Moddex-build/build/moddex-${TARGET_REF}-linux-amd64.tar.gz .
-          cp Moddex-build/build/moddex-${TARGET_REF}-linux-amd64.tar.gz.sha256 .
+          cp "Moddex-build/build/moddex-${TARGET_REF}-linux-amd64.tar.gz" .
+          cp "Moddex-build/build/moddex-${TARGET_REF}-linux-amd64.tar.gz.sha256" .
           cp Moddex-build/scripts/download.sh download.sh
           sha256sum download.sh > download.sh.sha256
 
-      # 10) Create release and upload assets
+      - name: Verify checksum
+        run: sha256sum -c "moddex-${TARGET_REF}-linux-amd64.tar.gz.sha256"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -99,4 +113,3 @@ jobs:
             moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz.sha256
             download.sh
             download.sh.sha256
-
