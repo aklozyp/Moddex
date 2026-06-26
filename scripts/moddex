@@ -45,7 +45,11 @@ need_cmd() { command -v "$1" >/dev/null 2>&1 || die "$EX_DEP" "missing required 
 
 # Load SERVER_ADDRESS / SERVER_PORT from the machine-local env file if present.
 # Values already set in the environment win, so callers can override per-run.
+# Memoized: base_url() calls this on every request, but we only read/warn once.
+ENV_LOADED=0
 load_env() {
+    [[ "$ENV_LOADED" -eq 1 ]] && return 0
+    ENV_LOADED=1
     if [[ -r "$ENV_FILE" ]]; then
         local addr port
         # Read without polluting the current shell beyond what we extract.
@@ -53,6 +57,12 @@ load_env() {
         port="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_PORT:-}")"
         [[ -z "${SERVER_ADDRESS:-}" && -n "$addr" ]] && SERVER_ADDRESS="$addr"
         [[ -z "${SERVER_PORT:-}" && -n "$port" ]] && SERVER_PORT="$port"
+    elif [[ -e "$ENV_FILE" && -z "${SERVER_ADDRESS:-}" && -z "${SERVER_PORT:-}" ]]; then
+        # The file exists but this user cannot read it (it is 0640 root:moddex).
+        # Warn instead of silently contacting the wrong endpoint on custom-port
+        # installs; root or members of the 'moddex' group get the real values.
+        err "warning: $ENV_FILE is not readable by this user; falling back to ${SERVER_ADDRESS:-127.0.0.1}:${SERVER_PORT:-8080}."
+        err "         Run via sudo, join the 'moddex' group, or set SERVER_ADDRESS/SERVER_PORT to target the configured endpoint."
     fi
     SERVER_PORT="${SERVER_PORT:-8080}"
     SERVER_ADDRESS="${SERVER_ADDRESS:-127.0.0.1}"

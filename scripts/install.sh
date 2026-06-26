@@ -101,6 +101,25 @@ if [[ -z "$MODE" && -n "$EXISTING_MODE" ]]; then
   log "Reusing existing deployment mode from $ENV_FILE: $MODE"
 fi
 
+# Legacy migration: installs from the previous installer have no moddex.env but a
+# systemd unit carrying SERVER_ADDRESS/SERVER_PORT. Recover them so unattended
+# upgrades (update.sh/download.sh, which call install.sh without --mode) keep
+# working instead of failing the non-interactive guard below.
+LEGACY_SERVICE_FILE=/etc/systemd/system/moddex-backend.service
+if [[ -z "$MODE" && "$CONFIG_EXISTS" -eq 0 && -f "$LEGACY_SERVICE_FILE" ]]; then
+  legacy_addr="$(sed -n 's/^Environment=SERVER_ADDRESS=//p' "$LEGACY_SERVICE_FILE" | tail -n1 | tr -d '\r')"
+  legacy_port="$(sed -n 's/^Environment=SERVER_PORT=//p' "$LEGACY_SERVICE_FILE" | tail -n1 | tr -d '\r')"
+  if [[ -n "$legacy_addr" ]]; then
+    case "$legacy_addr" in
+      127.0.0.1|localhost|::1) MODE="local" ;;
+      *) MODE="lan" ;;   # 0.0.0.0 etc.: lan is the safe non-public default
+    esac
+    # Keep the previous port unless the operator overrode it explicitly.
+    [[ "$PORT_EXPLICIT" -eq 1 || -z "$legacy_port" ]] || SERVER_PORT="$legacy_port"
+    log "Migrating configuration from existing systemd unit (mode=$MODE, port=$SERVER_PORT)"
+  fi
+fi
+
 if [[ -z "$MODE" ]]; then
   if [[ -t 0 ]]; then
     log "In which mode do you want to operate Moddex?"
