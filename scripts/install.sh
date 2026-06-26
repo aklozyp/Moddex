@@ -263,6 +263,22 @@ EOF
   chmod 0640 "$ENV_FILE"
 }
 
+# Update (or append) a single KEY=value line in $ENV_FILE in place, leaving every
+# other line untouched. Used when an operator changes only --mode/--port so any
+# custom keys they added (e.g. MODDEX_CORS_ALLOWED_ORIGINS) are preserved.
+upsert_env_key() {
+  local key="$1" value="$2" tmp
+  tmp="$(mktemp "${ENV_FILE}.XXXXXX")"
+  awk -v k="$key" -v v="$value" '
+    index($0, k"=") == 1 { print k"="v; done=1; next }
+    { print }
+    END { if (!done) print k"="v }
+  ' "$ENV_FILE" > "$tmp"
+  chown root:moddex "$tmp" 2>/dev/null || true
+  chmod 0640 "$tmp"
+  mv -f "$tmp" "$ENV_FILE"
+}
+
 if [[ "$CONFIG_EXISTS" -eq 1 ]]; then
   # Baseline values from the existing file.
   # shellcheck disable=SC1090
@@ -277,7 +293,11 @@ if [[ "$CONFIG_EXISTS" -eq 1 ]]; then
     # keep the operator's existing bind address rather than recomputing it.
     [[ "$MODE_EXPLICIT" -eq 1 || -z "$EXISTING_ADDR" ]] || SERVER_ADDRESS="$EXISTING_ADDR"
     log "Updating configuration at $ENV_FILE (explicit --mode/--port given)"
-    write_env_file
+    # Touch only the managed connection keys; preserve any operator-added lines.
+    upsert_env_key MODDEX_MODE "$MODE"
+    upsert_env_key MODDEX_SECURITY_MODE "$MODE"
+    upsert_env_key SERVER_ADDRESS "$SERVER_ADDRESS"
+    upsert_env_key SERVER_PORT "$SERVER_PORT"
   else
     log "Preserving existing configuration at $ENV_FILE (pass --mode/--port to change it)"
     [[ -n "$EXISTING_PORT" ]] && SERVER_PORT="$EXISTING_PORT"
