@@ -26,6 +26,9 @@ readonly EX_UNREACHABLE=5
 readonly EX_DEP=6
 
 readonly SERVICE="moddex-backend.service"
+# World-readable (0644 root:root) systemd unit — a reliable "an install exists"
+# marker that any user can stat even when /etc/moddex (0750) is not traversable.
+readonly SERVICE_UNIT="/etc/systemd/system/${SERVICE}"
 
 # FHS layout - kept in lock-step with scripts/install.sh and the systemd unit.
 APP_DIR="${MODDEX_APP_DIR:-/opt/moddex}"
@@ -57,12 +60,14 @@ load_env() {
         port="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_PORT:-}")"
         [[ -z "${SERVER_ADDRESS:-}" && -n "$addr" ]] && SERVER_ADDRESS="$addr"
         [[ -z "${SERVER_PORT:-}" && -n "$port" ]] && SERVER_PORT="$port"
-    elif [[ -z "${SERVER_ADDRESS:-}" && -z "${SERVER_PORT:-}" && ( -e "$ENV_FILE" || -d "$CONFIG_DIR" ) ]]; then
-        # An install is present ($CONFIG_DIR exists) but this user cannot read the
-        # config: the file is 0640 root:moddex inside a 0750 root:moddex dir, so a
-        # non-root user outside the 'moddex' group can neither read nor even
-        # traverse to it (then -e is false too). Warn instead of silently
-        # contacting the wrong endpoint on custom-address/port installs.
+    elif [[ -z "${SERVER_ADDRESS:-}" && -z "${SERVER_PORT:-}" && ( -e "$ENV_FILE" || -d "$CONFIG_DIR" || -e "$SERVICE_UNIT" ) ]]; then
+        # An install is present but this user cannot read the config: the file is
+        # 0640 root:moddex inside a 0750 root:moddex dir, so a non-root user
+        # outside the 'moddex' group can neither read nor traverse to it (then -e
+        # on the file, and even -d on the dir if /etc itself were restricted, can
+        # be false). The world-readable systemd unit is a reliable fallback
+        # marker. Warn instead of silently contacting the wrong endpoint on
+        # custom-address/port installs.
         err "warning: cannot read $ENV_FILE ($CONFIG_DIR may be inaccessible to this user); falling back to ${SERVER_ADDRESS:-127.0.0.1}:${SERVER_PORT:-8080}."
         err "         Run via sudo, join the 'moddex' group, or set SERVER_ADDRESS/SERVER_PORT to target the configured endpoint."
     fi
