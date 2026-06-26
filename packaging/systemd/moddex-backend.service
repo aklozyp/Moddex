@@ -1,21 +1,50 @@
 [Unit]
 Description=Moddex Backend API
-After=network.target
+Documentation=https://github.com/aklozyp/Moddex
+After=network-online.target
+Wants=network-online.target
 
 [Service]
+Type=simple
 User=moddex
 Group=moddex
 WorkingDirectory=/opt/moddex
+
+# Runtime configuration. The installer writes machine-local settings (bind
+# address, port, mode) into /etc/moddex/moddex.env. The leading "-" makes the
+# file optional so the unit still starts if it is absent. Updates never
+# overwrite this file, so local settings survive upgrades.
+EnvironmentFile=-/etc/moddex/moddex.env
 Environment=MODDEX_ROOT=/var/lib/moddex
-Environment=MODDEX_LOG_DIR=/var/lib/moddex/logs
+Environment=MODDEX_CONFIG_DIR=/etc/moddex
+Environment=MODDEX_LOG_DIR=/var/log/moddex
 Environment=SERVER_ADDRESS=127.0.0.1
 Environment=SERVER_PORT=8080
+
 ExecStart=/usr/bin/env java -jar /opt/moddex/app.jar
 Restart=on-failure
 RestartSec=5
+# 143 = SIGTERM, 130 = SIGINT: clean shutdowns must not count as failures.
 SuccessExitStatus=143 130
-StandardOutput=append:/var/lib/moddex/logs/backend.out.log
-StandardError=append:/var/lib/moddex/logs/backend.err.log
+
+StandardOutput=append:/var/log/moddex/backend.out.log
+StandardError=append:/var/log/moddex/backend.err.log
+
+# --- Hardening ---------------------------------------------------------------
+# The service only needs to write to its data and log directories; everything
+# else is read-only or inaccessible. ReadWritePaths must list every writable
+# location the backend touches at runtime.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/moddex /var/log/moddex
 
 [Install]
 WantedBy=multi-user.target

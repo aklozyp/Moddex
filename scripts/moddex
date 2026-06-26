@@ -1,0 +1,425 @@
+#!/usr/bin/env bash
+#
+# moddex - administrative CLI for a native Moddex installation.
+#
+# Wraps the systemd service and the backend REST API so admins can run basic
+# operations from the terminal without the web UI. Installed to
+# /usr/local/bin/moddex by scripts/install.sh.
+#
+# Stable exit codes (do not renumber - scripts/automation may rely on them):
+#   0  success
+#   1  generic runtime error
+#   2  usage error (unknown command, missing or invalid arguments)
+#   3  service control failure (systemctl) or service not running
+#   4  authentication required or failed
+#   5  backend unreachable
+#   6  missing dependency (e.g. curl)
+#
+set -Eeuo pipefail
+
+readonly EX_OK=0
+readonly EX_ERR=1
+readonly EX_USAGE=2
+readonly EX_SERVICE=3
+readonly EX_AUTH=4
+readonly EX_UNREACHABLE=5
+readonly EX_DEP=6
+
+readonly SERVICE="moddex-backend.service"
+
+# FHS layout - kept in lock-step with scripts/install.sh and the systemd unit.
+APP_DIR="${MODDEX_APP_DIR:-/opt/moddex}"
+DATA_DIR="${MODDEX_ROOT:-/var/lib/moddex}"
+CONFIG_DIR="${MODDEX_CONFIG_DIR:-/etc/moddex}"
+LOG_DIR="${MODDEX_LOG_DIR:-/var/log/moddex}"
+ENV_FILE="${CONFIG_DIR}/moddex.env"
+
+log()  { printf '%s\n' "$*"; }
+err()  { printf 'moddex: %s\n' "$*" >&2; }
+die()  { local code="$1"; shift; err "$*"; exit "$code"; }
+need_cmd() { command -v "$1" >/dev/null 2>&1 || die "$EX_DEP" "missing required command: $1"; }
+
+# ---------------------------------------------------------------------------
+# Configuration / connection details
+# ---------------------------------------------------------------------------
+
+# Load SERVER_ADDRESS / SERVER_PORT from the machine-local env file if present.
+# Values already set in the environment win, so callers can override per-run.
+load_env() {
+    if [[ -r "$ENV_FILE" ]]; then
+        local addr port
+        # Read without polluting the current shell beyond what we extract.
+        addr="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_ADDRESS:-}")"
+        port="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_PORT:-}")"
+        [[ -z "${SERVER_ADDRESS:-}" && -n "$addr" ]] && SERVER_ADDRESS="$addr"
+        [[ -z "${SERVER_PORT:-}" && -n "$port" ]] && SERVER_PORT="$port"
+    fi
+    SERVER_PORT="${SERVER_PORT:-8080}"
+    SERVER_ADDRESS="${SERVER_ADDRESS:-127.0.0.1}"
+}
+
+# Base URL for API calls. A wildcard bind (0.0.0.0 / ::) is not connectable, so
+# the CLI always talks to loopback from the same host.
+base_url() {
+    load_env
+    local host="$SERVER_ADDRESS"
+    case "$host" in
+        0.0.0.0|""|"::"|"[::]") host="127.0.0.1" ;;
+    esac
+    printf 'http://%s:%s' "$host" "$SERVER_PORT"
+}
+
+# ---------------------------------------------------------------------------
+# HTTP helpers
+# ---------------------------------------------------------------------------
+
+# Emits the HTTP status code for a request (000 means no response). curl's exit
+# status is swallowed so a connection failure does not abort the script under
+# `set -e`; callers branch on the emitted code instead.
+http_status() {
+    local method="$1" path="$2"; shift 2
+    curl -s -o /dev/null -w '%{http_code}' -X "$method" "$@" "$(base_url)${path}" || true
+}
+
+# Emits the response body (stdout) and the status code (last line) separated by
+# a newline so callers can inspect both. As above, curl failures are swallowed.
+http_body_status() {
+    local method="$1" path="$2"; shift 2
+    curl -s -w '\n%{http_code}' -X "$method" "$@" "$(base_url)${path}" || true
+}
+
+TOKEN="${MODDEX_API_TOKEN:-}"
+
+# Resolves a bearer token for authenticated API calls. Order of precedence:
+#   1. --token / MODDEX_API_TOKEN (already in $TOKEN)
+#   2. MODDEX_ADMIN_PASSWORD -> POST /api/v1/auth/login
+#   3. interactive password prompt -> login
+ensure_token() {
+    need_cmd curl
+    [[ -n "$TOKEN" ]] && return 0
+
+    local password="${MODDEX_ADMIN_PASSWORD:-}"
+    if [[ -z "$password" ]]; then
+        if [[ -t 0 ]]; then
+            printf 'Admin password: ' >&2
+            read -r -s password
+            printf '\n' >&2
+        else
+            die "$EX_AUTH" "no token available. Set MODDEX_API_TOKEN or MODDEX_ADMIN_PASSWORD, or run interactively."
+        fi
+    fi
+    [[ -n "$password" ]] || die "$EX_AUTH" "empty password; cannot authenticate."
+
+    local out status body
+    # Build the JSON body without exposing the password on the command line.
+    out="$(printf '{"password":%s}' "$(json_string "$password")" \
+        | curl -s -w '\n%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            --data @- "$(base_url)/api/v1/auth/login")" || true
+    status="${out##*$'\n'}"
+    body="${out%$'\n'*}"
+
+    case "$status" in
+        200) ;;
+        000) die "$EX_UNREACHABLE" "backend unreachable at $(base_url)." ;;
+        401) die "$EX_AUTH" "invalid admin password." ;;
+        403) die "$EX_AUTH" "setup not completed yet; finish the first-run setup in the web UI." ;;
+        429) die "$EX_AUTH" "too many failed login attempts; try again later." ;;
+        *)   die "$EX_AUTH" "login failed (HTTP $status)." ;;
+    esac
+
+    TOKEN="$(printf '%s' "$body" | extract_json_string token)"
+    [[ -n "$TOKEN" ]] || die "$EX_AUTH" "login succeeded but no token was returned."
+}
+
+auth_header() { printf 'Authorization: Bearer %s' "$TOKEN"; }
+
+# ---------------------------------------------------------------------------
+# Minimal JSON helpers (jq when available, portable fallback otherwise)
+# ---------------------------------------------------------------------------
+
+have_jq() { command -v jq >/dev/null 2>&1; }
+
+# Quotes an arbitrary string as a JSON string literal.
+json_string() {
+    if have_jq; then
+        printf '%s' "$1" | jq -Rs .
+    else
+        local s="$1"
+        s="${s//\\/\\\\}"
+        s="${s//\"/\\\"}"
+        printf '"%s"' "$s"
+    fi
+}
+
+# Extracts a top-level string field from a JSON object on stdin.
+extract_json_string() {
+    local key="$1"
+    if have_jq; then
+        jq -r --arg k "$key" '.[$k] // empty'
+    else
+        # Best-effort regex fallback for flat objects: "key":"value".
+        grep -o "\"$key\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" \
+            | head -n1 | sed 's/.*:[[:space:]]*"//;s/"$//'
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Service control (needs root; re-exec via sudo when necessary)
+# ---------------------------------------------------------------------------
+
+reexec_root() {
+    if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+        if command -v sudo >/dev/null 2>&1; then
+            exec sudo -E "$0" "$@"
+        fi
+        die "$EX_SERVICE" "this command needs root privileges (install sudo or run as root)."
+    fi
+}
+
+service_action() {
+    local action="$1"
+    need_cmd systemctl
+    reexec_root "$action"
+    if systemctl "$action" "$SERVICE"; then
+        log "$SERVICE: $action ok"
+    else
+        die "$EX_SERVICE" "systemctl $action $SERVICE failed."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+cmd_status() {
+    need_cmd systemctl
+    local active enabled
+    active="$(systemctl is-active "$SERVICE" 2>/dev/null || true)"
+    enabled="$(systemctl is-enabled "$SERVICE" 2>/dev/null || true)"
+    log "Service:   $SERVICE"
+    log "Active:    ${active:-unknown}"
+    log "Enabled:   ${enabled:-unknown}"
+    log "Endpoint:  $(base_url)"
+
+    local reachable="no" code=""
+    if command -v curl >/dev/null 2>&1; then
+        # /api/v1/setup/status is unauthenticated, so any HTTP response proves
+        # the backend is up without needing a token.
+        code="$(http_status GET /api/v1/setup/status || true)"
+        [[ -n "$code" && "$code" != "000" ]] && reachable="yes"
+    else
+        code="curl-missing"
+    fi
+    log "Reachable: $reachable${code:+ (HTTP $code)}"
+
+    [[ "$active" == "active" ]] || return "$EX_SERVICE"
+    [[ "$reachable" == "yes" ]] || return "$EX_UNREACHABLE"
+    return "$EX_OK"
+}
+
+cmd_version() {
+    local version="unknown" jar="$APP_DIR/app.jar" build="unknown"
+    if [[ -r "$APP_DIR/VERSION" ]]; then
+        version="$(sed -n '1p' "$APP_DIR/VERSION" | tr -d '\r\n')"
+    fi
+    if [[ -f "$jar" ]]; then
+        build="$(date -r "$jar" '+%Y-%m-%d %H:%M:%S %z' 2>/dev/null || echo unknown)"
+    fi
+    log "Moddex version: ${version:-unknown}"
+    log "Backend build:  $build"
+    log ""
+    log "Paths:"
+    log "  application: $APP_DIR"
+    log "  data:        $DATA_DIR"
+    log "  config:      $CONFIG_DIR (env: $ENV_FILE)"
+    log "  logs:        $LOG_DIR"
+}
+
+cmd_list_instances() {
+    ensure_token
+    local out status body
+    out="$(http_body_status GET /api/v1/instance -H "$(auth_header)")"
+    status="${out##*$'\n'}"
+    body="${out%$'\n'*}"
+    case "$status" in
+        200) ;;
+        000) die "$EX_UNREACHABLE" "backend unreachable at $(base_url)." ;;
+        401|403) die "$EX_AUTH" "not authorized (HTTP $status)." ;;
+        *)   die "$EX_ERR" "could not list instances (HTTP $status)." ;;
+    esac
+
+    if have_jq; then
+        local count
+        count="$(printf '%s' "$body" | jq 'length')"
+        if [[ "$count" -eq 0 ]]; then
+            log "No instances."
+            return "$EX_OK"
+        fi
+        printf '%-38s %s\n' "ID" "NAME"
+        printf '%s' "$body" | jq -r '.[] | "\(.id // "?")\t\(.name // "?")"' \
+            | while IFS=$'\t' read -r id name; do printf '%-38s %s\n' "$id" "$name"; done
+    else
+        log "Instances (install jq for formatted output):"
+        printf '%s\n' "$body"
+    fi
+}
+
+cmd_backup() {
+    local id="" type=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --type) [[ $# -ge 2 ]] || die "$EX_USAGE" "missing value for --type"; type="$2"; shift 2 ;;
+            -*) die "$EX_USAGE" "unknown option: $1" ;;
+            *) [[ -z "$id" ]] || die "$EX_USAGE" "unexpected argument: $1"; id="$1"; shift ;;
+        esac
+    done
+    [[ -n "$id" ]] || die "$EX_USAGE" "usage: moddex backup <instance-id> [--type standard|full]"
+    if [[ -n "$type" ]]; then
+        type="$(printf '%s' "$type" | tr '[:upper:]' '[:lower:]')"
+        case "$type" in standard|full) ;; *) die "$EX_USAGE" "invalid --type: $type (expected standard or full)" ;; esac
+    fi
+
+    ensure_token
+    local path="/api/v1/instance/${id}/backups"
+    [[ -n "$type" ]] && path="${path}?type=${type}"
+    local status
+    status="$(http_status POST "$path" -H "$(auth_header)")"
+    case "$status" in
+        200|201) log "Backup created for instance $id${type:+ (type: $type)}." ;;
+        000) die "$EX_UNREACHABLE" "backend unreachable at $(base_url)." ;;
+        401|403) die "$EX_AUTH" "not authorized (HTTP $status)." ;;
+        404) die "$EX_ERR" "instance not found: $id" ;;
+        *)   die "$EX_ERR" "backup failed (HTTP $status)." ;;
+    esac
+}
+
+cmd_restore() {
+    local id="" name="" assume_yes=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--yes) assume_yes=1; shift ;;
+            -*) die "$EX_USAGE" "unknown option: $1" ;;
+            *)
+                if [[ -z "$id" ]]; then id="$1"
+                elif [[ -z "$name" ]]; then name="$1"
+                else die "$EX_USAGE" "unexpected argument: $1"; fi
+                shift ;;
+        esac
+    done
+    [[ -n "$id" && -n "$name" ]] || die "$EX_USAGE" "usage: moddex restore <instance-id> <backup-name> [--yes]"
+
+    # Restore overwrites the live instance state, so require explicit confirmation.
+    if [[ "$assume_yes" -ne 1 ]]; then
+        if [[ -t 0 ]]; then
+            printf 'Restore backup "%s" onto instance %s? This overwrites current state. [y/N] ' "$name" "$id" >&2
+            local ans; read -r ans
+            [[ "${ans,,}" == y* ]] || die "$EX_OK" "aborted."
+        else
+            die "$EX_USAGE" "refusing destructive restore without --yes in a non-interactive session."
+        fi
+    fi
+
+    ensure_token
+    local status
+    status="$(http_status POST "/api/v1/instance/${id}/backups/${name}/restore" -H "$(auth_header)")"
+    case "$status" in
+        200|204) log "Restore of \"$name\" onto instance $id completed." ;;
+        000) die "$EX_UNREACHABLE" "backend unreachable at $(base_url)." ;;
+        401|403) die "$EX_AUTH" "not authorized (HTTP $status)." ;;
+        404) die "$EX_ERR" "instance or backup not found ($id / $name)." ;;
+        400) die "$EX_ERR" "restore rejected: invalid or corrupt backup (HTTP 400)." ;;
+        *)   die "$EX_ERR" "restore failed (HTTP $status)." ;;
+    esac
+}
+
+cmd_logs() {
+    local follow=0
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--follow) follow=1; shift ;;
+            *) die "$EX_USAGE" "unknown option: $1" ;;
+        esac
+    done
+    local out="$LOG_DIR/backend.out.log"
+    [[ -r "$out" ]] || die "$EX_ERR" "log file not readable: $out (need root?)"
+    if [[ "$follow" -eq 1 ]]; then
+        tail -f "$out"
+    else
+        tail -n 200 "$out"
+    fi
+}
+
+usage() {
+    cat <<'USAGE'
+moddex - administrative CLI for a native Moddex installation
+
+Usage: moddex <command> [options]
+
+Service commands:
+  status                  Show service state, endpoint and reachability
+  start                   Start the Moddex backend service
+  stop                    Stop the Moddex backend service
+  restart                 Restart the Moddex backend service
+  version                 Show version, build date and installation paths
+
+Instance commands (require API authentication):
+  list-instances          List configured instances (id and name)
+  backup <id> [--type standard|full]
+                          Create a backup for an instance
+  restore <id> <name> [--yes]
+                          Restore a backup onto an instance (destructive)
+
+Other:
+  logs [--follow]         Show the backend log (last 200 lines, -f to follow)
+  help                    Show this help
+
+Authentication (instance commands):
+  Provide a token via --token / MODDEX_API_TOKEN, or a password via
+  MODDEX_ADMIN_PASSWORD. Without either, the CLI prompts interactively.
+
+Connection:
+  Reads SERVER_ADDRESS / SERVER_PORT from /etc/moddex/moddex.env. A wildcard
+  bind is contacted on 127.0.0.1.
+
+Exit codes:
+  0 success   1 error   2 usage   3 service   4 auth   5 unreachable   6 dependency
+USAGE
+}
+
+# ---------------------------------------------------------------------------
+# Argument dispatch
+# ---------------------------------------------------------------------------
+
+main() {
+    [[ $# -ge 1 ]] || { usage >&2; exit "$EX_USAGE"; }
+
+    local cmd="$1"; shift
+
+    # A global --token flag is accepted anywhere after the command; everything
+    # else is forwarded to the command handler.
+    local rest=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --token) [[ $# -ge 2 ]] || die "$EX_USAGE" "missing value for --token"; TOKEN="$2"; shift 2 ;;
+            *) rest+=("$1"); shift ;;
+        esac
+    done
+    set -- "${rest[@]+"${rest[@]}"}"
+
+    case "$cmd" in
+        status)          cmd_status ;;
+        start)           service_action start ;;
+        stop)            service_action stop ;;
+        restart)         service_action restart ;;
+        version|--version|-V) cmd_version ;;
+        list-instances)  cmd_list_instances ;;
+        backup)          cmd_backup "$@" ;;
+        restore)         cmd_restore "$@" ;;
+        logs)            cmd_logs "$@" ;;
+        help|-h|--help)  usage ;;
+        *) err "unknown command: $cmd"; usage >&2; exit "$EX_USAGE" ;;
+    esac
+}
+
+main "$@"

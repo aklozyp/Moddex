@@ -5,6 +5,8 @@ read -p "Are you sure you want to uninstall? [y/N] " a
 sudo systemctl disable --now moddex-backend || true
 sudo rm -f /etc/systemd/system/moddex-backend.service
 sudo systemctl daemon-reload || true
-sudo rm -rf /opt/moddex /var/lib/moddex /etc/moddex
+# Application, data, config, logs and the administrative CLI.
+sudo rm -rf /opt/moddex /var/lib/moddex /etc/moddex /var/log/moddex
+sudo rm -f /usr/local/bin/moddex
 sudo userdel moddex 2>/dev/null || true
 echo "Moddex removed."
