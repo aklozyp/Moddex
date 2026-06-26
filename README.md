@@ -436,14 +436,9 @@ packaging/docs changes here target `develop`.
 Moddex ships German and English (`de`/`en`) with groundwork for right-to-left
 layouts; full 7-language coverage is a v0.3 goal
 ([#27](https://github.com/aklozyp/Moddex/issues/27)). UI strings live in the
-frontend under `src/assets/i18n/<lang>.json`. To contribute a translation:
+frontend under `src/assets/i18n/<lang>.json`, and a single registry entry adds a
+language to the switcher (English is always the fallback for missing keys).
 
-1. Copy `en.json` to your language code (e.g. `fr.json`) and translate the values
-   (keep the keys unchanged).
-2. Register the language in the frontend language registry so the switcher offers
-   it (English is always the fallback for missing keys).
-3. An i18n parity check (`i18n-parity.spec.ts`) fails the build if a key exists in
-   one language but not the other — run the frontend tests before submitting.
-
-A dedicated translation contribution guide is tracked in
-[#23](https://github.com/aklozyp/Moddex/issues/23).
+See the **[translation contribution guide](docs/translations.md)** for the full
+workflow: file locations, key/placeholder rules, RTL notes, how to verify
+completeness, and the PR checklist.
