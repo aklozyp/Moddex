@@ -79,6 +79,42 @@ bash update.sh
 
 The script compares `/opt/moddex/VERSION` (if present) to the latest GitHub release tag and upgrades automatically. If Moddex is not installed yet, it offers to run the installer.
 
+## Command-line interface (`moddex`)
+
+The installer places an administrative CLI at `/usr/local/bin/moddex` so basic operations can be performed from the terminal without the web UI.
+
+```bash
+moddex help            # full command reference
+moddex status          # service state, endpoint and reachability
+moddex start|stop|restart
+moddex version         # version, build date and installation paths
+moddex logs [--follow] # tail the backend log
+```
+
+Instance-scoped commands talk to the backend REST API and therefore require authentication:
+
+```bash
+moddex list-instances
+moddex backup <instance-id> [--type standard|full]
+moddex restore <instance-id> <backup-name> [--yes]   # destructive, asks for confirmation
+```
+
+**Authentication.** Provide a JWT via `--token` / the `MODDEX_API_TOKEN` environment variable, or an admin password via `MODDEX_ADMIN_PASSWORD` (the CLI then logs in for you). Without either, the CLI prompts for the password interactively. The connection target is derived from `/etc/moddex/moddex.env` (`SERVER_ADDRESS`/`SERVER_PORT`); a wildcard bind is contacted on `127.0.0.1`.
+
+**Exit codes** are stable so the CLI can be used in scripts:
+
+| Code | Meaning |
+|------|---------|
+| `0` | success |
+| `1` | generic runtime error |
+| `2` | usage error (unknown command, missing/invalid arguments) |
+| `3` | service control failure or service not running |
+| `4` | authentication required or failed |
+| `5` | backend unreachable |
+| `6` | missing dependency (e.g. `curl`) |
+
+`list-instances` prints aligned columns when [`jq`](https://jqlang.github.io/jq/) is installed and falls back to raw JSON otherwise.
+
 ## Private Linux Operation
 
 This section is aimed at private administrators who want to run Moddex securely on a home server or in a local network (LAN). It describes secure defaults, explicit anti-patterns, and the system layout the installer creates.
@@ -106,12 +142,17 @@ Verzeichnisstruktur nach der Installation:
 | Pfad | Berechtigungen | Inhalt |
 |------|---------------|--------|
 | `/opt/moddex/` | `0755 moddex:moddex` | Anwendungsdateien (`app.jar`, `VERSION`) |
-| `/var/lib/moddex/` | `0755 moddex:moddex` | Laufzeitdaten (Datenbank, Konfiguration) |
+| `/var/lib/moddex/` | `0755 moddex:moddex` | Laufzeitdaten (Datenbank, Instanz- und Backup-Daten) |
 | `/var/lib/moddex/ui/` | `0755 moddex:moddex` | Statische Frontend-Assets |
-| `/var/lib/moddex/logs/` | `0755 moddex:moddex` | Backend-Logs (`backend.out.log`, `backend.err.log`) |
+| `/var/log/moddex/` | `0755 moddex:moddex` | Backend-Logs (`backend.out.log`, `backend.err.log`) |
+| `/etc/moddex/` | `0750 root:moddex` | Maschinen-lokale Konfiguration |
+| `/etc/moddex/moddex.env` | `0640 root:moddex` | Betriebsmodus, Bind-Adresse, Port (vom Installer geschrieben) |
 | `/etc/systemd/system/moddex-backend.service` | `0644 root:root` | Systemd-Unit |
+| `/usr/local/bin/moddex` | `0755 root:root` | Administrative CLI (siehe unten) |
 
-Der Dienst läuft niemals als `root`. Die Dateien unter `/opt/moddex` und `/var/lib/moddex` gehören `moddex:moddex` und sind für andere Benutzer nur lesbar.
+Der Dienst läuft niemals als `root`. Die Dateien unter `/opt/moddex` und `/var/lib/moddex` gehören `moddex:moddex` und sind für andere Benutzer nur lesbar. Die systemd-Unit ist zusätzlich gehärtet (`ProtectSystem=strict`, `NoNewPrivileges`, schreibbar nur unter `/var/lib/moddex` und `/var/log/moddex`).
+
+**Update-Resistenz:** Ein erneuter Installer-Lauf **ohne** `--mode`/`--port` aktualisiert nur die Anwendungsartefakte (`app.jar`, Frontend, CLI, systemd-Unit); `/etc/moddex/moddex.env` und sämtliche Instanz-/Backup-Daten unter `/var/lib/moddex` bleiben unangetastet. Um Modus oder Port nachträglich zu ändern, starte den Installer **mit** explizitem `--mode`/`--port` (dann wird nur die betroffene Einstellung in `moddex.env` überschrieben) oder bearbeite die Datei direkt; anschließend `moddex restart` ausführen.
 
 ### Authentifizierung
 
@@ -129,7 +170,7 @@ Sichere Defaults für den Privatbetrieb:
 
 Passwörter und Tokens werden **nicht** vom Installer verwaltet; sie entstehen aus der laufenden Anwendung heraus. Hinterlege keine Zugangsdaten in der `moddex-backend.service`-Datei.
 
-> **Anti-Pattern:** Die CORS-Konfiguration des Backends erlaubt im Auslieferungszustand alle Ursprünge (`allowedOrigins = "*"`). Für öffentlichen Betrieb sollte der Reverse Proxy die erlaubten Ursprünge einschränken bzw. den Zugriff zusätzlich absichern.
+> **CORS:** Das Backend ist fail-closed konfiguriert. Im `local`-Modus sind nur Loopback-Ursprünge erlaubt; in `lan`/`public` ist Cross-Origin-Zugriff aus dem Browser deaktiviert, bis `MODDEX_CORS_ALLOWED_ORIGINS` (bzw. `moddex.security.cors.allowed-origins`) eine explizite Allow-List setzt. Siehe `docs/security-configuration.md` im Backend-Repo.
 
 ### Firewall (UFW / firewalld)
 
@@ -223,8 +264,8 @@ Für produktive oder sicherheitskritische Umgebungen diese Funktionen deaktivier
 - [ ] Installer mit `--mode lan` ausgeführt
 - [ ] UFW aktiv und nur notwendige Ports geöffnet
 - [ ] Router leitet Port **nicht** ins Internet weiter
-- [ ] Backend läuft als Benutzer `moddex` (prüfen: `systemctl status moddex-backend`)
-- [ ] Logs unter `/var/lib/moddex/logs/` erreichbar und lesbar
+- [ ] Backend läuft als Benutzer `moddex` (prüfen: `moddex status` oder `systemctl status moddex-backend`)
+- [ ] Logs unter `/var/log/moddex/` erreichbar und lesbar (`moddex logs`)
 - [ ] Regelmäßiges Backup von `/var/lib/moddex` eingerichtet
 - [ ] Experimentelle Funktionen nur bewusst aktivieren
 
@@ -259,3 +300,34 @@ and file operations cannot silently destroy instances:
   BASE_URL=http://127.0.0.1:8080 TOKEN=<jwt> INSTANCE_ID=<uuid> \
     scripts/smoke-test.sh            # add --with-restore for the destructive restore step
   ```
+
+### Debian/Ubuntu install smoke test
+
+After a fresh install on Debian 12 / Ubuntu 22.04+ (or a clean VM/container), verify the
+native deployment end to end:
+
+```bash
+# 1. Install (non-interactive). Pass the artifacts produced by build-bundle.sh.
+sudo ./scripts/install.sh --mode lan --port 8080
+
+# 2. Service is up and managed by systemd.
+moddex status                         # Active: active, Reachable: yes
+systemctl is-enabled moddex-backend   # enabled (starts on boot)
+
+# 3. Version and paths are reported.
+moddex version
+
+# 4. Auth is enforced before any token is issued.
+curl -i http://127.0.0.1:8080/api/v1/instance   # expect HTTP/1.1 401
+
+# 5. Complete the first-run setup in the web UI, then exercise the API:
+MODDEX_ADMIN_PASSWORD='<your-admin-password>' moddex list-instances
+
+# 6. Update resistance: re-running the installer must not touch local config/data.
+sudo ./scripts/install.sh             # reuses mode/port from /etc/moddex/moddex.env
+sudo cat /etc/moddex/moddex.env       # unchanged
+```
+
+Acceptance: after the installer the service is running under systemd and the web UI is
+reachable; a second installer run upgrades the artifacts without overwriting
+`/etc/moddex/moddex.env` or any instance data under `/var/lib/moddex`.
