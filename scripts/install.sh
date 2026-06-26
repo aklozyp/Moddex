@@ -38,7 +38,17 @@ MIN_JAVA_VERSION=17
 MODE="${MODE:-${MODDEX_MODE:-}}"
 BACKEND_JAR="${BACKEND_JAR:-${MODDEX_BACKEND_JAR:-}}"
 FRONTEND_DIR="${FRONTEND_DIR:-${MODDEX_FRONTEND_DIR:-}}"
-SERVER_PORT="${PORT:-${MODDEX_PORT:-8080}}"
+
+# Track whether mode/port were given explicitly (env var or CLI flag) vs left at
+# their default. On a re-install we only rewrite an existing moddex.env when the
+# operator actually supplied an override, so unattended upgrades stay
+# non-destructive but an explicit `--mode/--port` re-run still takes effect.
+MODE_EXPLICIT=0
+[[ -n "$MODE" ]] && MODE_EXPLICIT=1
+PORT_INPUT="${PORT:-${MODDEX_PORT:-}}"
+PORT_EXPLICIT=0
+[[ -n "$PORT_INPUT" ]] && PORT_EXPLICIT=1
+SERVER_PORT="${PORT_INPUT:-8080}"
 
 log() { printf '[moddex-install] %s\n' "$*"; }
 die() { printf '[ERROR] %s\n' "$*" >&2; exit 1; }
@@ -66,10 +76,10 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --mode) [[ $# -ge 2 ]] || die "Missing value for --mode"; MODE="$2"; shift 2 ;;
+    --mode) [[ $# -ge 2 ]] || die "Missing value for --mode"; MODE="$2"; MODE_EXPLICIT=1; shift 2 ;;
     --backend-jar) [[ $# -ge 2 ]] || die "Missing value for --backend-jar"; BACKEND_JAR="$2"; shift 2 ;;
     --frontend-dir) [[ $# -ge 2 ]] || die "Missing value for --frontend-dir"; FRONTEND_DIR="$2"; shift 2 ;;
-    --port) [[ $# -ge 2 ]] || die "Missing value for --port"; SERVER_PORT="$2"; shift 2 ;;
+    --port) [[ $# -ge 2 ]] || die "Missing value for --port"; SERVER_PORT="$2"; PORT_EXPLICIT=1; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown argument: $1" ;;
   esac
@@ -209,19 +219,16 @@ case "$MODE" in
   lan|public) SERVER_ADDRESS="0.0.0.0" ;;
 esac
 
-# Machine-local runtime configuration. Written once; left untouched on upgrades
-# so operator settings survive. To change mode/port later, edit this file (or
-# re-run with --mode/--port) and restart the service.
-if [[ "$CONFIG_EXISTS" -eq 1 ]]; then
-  log "Preserving existing configuration at $ENV_FILE (edit it to change mode/port)"
-  # shellcheck disable=SC1090
-  SERVER_PORT="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_PORT:-$SERVER_PORT}")"
-else
-  log "Writing configuration to $ENV_FILE"
+# Machine-local runtime configuration. On a fresh install it is written once. On
+# a re-install it is only rewritten when the operator passes an explicit
+# --mode/--port (or MODDEX_MODE/MODDEX_PORT); otherwise it is preserved so plain
+# upgrades never disturb operator settings.
+write_env_file() {
   umask 027
   cat > "$ENV_FILE" <<EOF
 # Moddex machine-local configuration. Managed by the operator.
-# The installer does NOT overwrite this file on upgrades.
+# The installer rewrites this file only when --mode/--port (or MODDEX_MODE/
+# MODDEX_PORT) are given explicitly; plain upgrades leave it untouched.
 MODDEX_MODE=$MODE
 MODDEX_ROOT=$DATA_DIR
 MODDEX_CONFIG_DIR=$CONFIG_DIR
@@ -232,6 +239,31 @@ EOF
   umask 022
   chown root:moddex "$ENV_FILE"
   chmod 0640 "$ENV_FILE"
+}
+
+if [[ "$CONFIG_EXISTS" -eq 1 ]]; then
+  # Baseline values from the existing file.
+  # shellcheck disable=SC1090
+  EXISTING_PORT="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_PORT:-}")"
+  # shellcheck disable=SC1090
+  EXISTING_ADDR="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_ADDRESS:-}")"
+
+  if [[ "$MODE_EXPLICIT" -eq 1 || "$PORT_EXPLICIT" -eq 1 ]]; then
+    # Honor explicit overrides; keep non-overridden values from the existing file.
+    [[ "$PORT_EXPLICIT" -eq 1 || -z "$EXISTING_PORT" ]] || SERVER_PORT="$EXISTING_PORT"
+    # SERVER_ADDRESS was derived from MODE above. If the mode was not overridden,
+    # keep the operator's existing bind address rather than recomputing it.
+    [[ "$MODE_EXPLICIT" -eq 1 || -z "$EXISTING_ADDR" ]] || SERVER_ADDRESS="$EXISTING_ADDR"
+    log "Updating configuration at $ENV_FILE (explicit --mode/--port given)"
+    write_env_file
+  else
+    log "Preserving existing configuration at $ENV_FILE (pass --mode/--port to change it)"
+    [[ -n "$EXISTING_PORT" ]] && SERVER_PORT="$EXISTING_PORT"
+    [[ -n "$EXISTING_ADDR" ]] && SERVER_ADDRESS="$EXISTING_ADDR"
+  fi
+else
+  log "Writing configuration to $ENV_FILE"
+  write_env_file
 fi
 
 SERVICE_FILE=/etc/systemd/system/moddex-backend.service

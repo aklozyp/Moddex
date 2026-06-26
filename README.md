@@ -152,7 +152,7 @@ Verzeichnisstruktur nach der Installation:
 
 Der Dienst läuft niemals als `root`. Die Dateien unter `/opt/moddex` und `/var/lib/moddex` gehören `moddex:moddex` und sind für andere Benutzer nur lesbar. Die systemd-Unit ist zusätzlich gehärtet (`ProtectSystem=strict`, `NoNewPrivileges`, schreibbar nur unter `/var/lib/moddex` und `/var/log/moddex`).
 
-**Update-Resistenz:** Ein erneuter Installer-Lauf aktualisiert nur die Anwendungsartefakte (`app.jar`, Frontend, CLI, systemd-Unit). Die Datei `/etc/moddex/moddex.env` und sämtliche Instanz-/Backup-Daten unter `/var/lib/moddex` bleiben unangetastet. Um Modus oder Port nachträglich zu ändern, bearbeite `/etc/moddex/moddex.env` (oder starte den Installer mit `--mode`/`--port`) und führe anschließend `moddex restart` aus.
+**Update-Resistenz:** Ein erneuter Installer-Lauf **ohne** `--mode`/`--port` aktualisiert nur die Anwendungsartefakte (`app.jar`, Frontend, CLI, systemd-Unit); `/etc/moddex/moddex.env` und sämtliche Instanz-/Backup-Daten unter `/var/lib/moddex` bleiben unangetastet. Um Modus oder Port nachträglich zu ändern, starte den Installer **mit** explizitem `--mode`/`--port` (dann wird nur die betroffene Einstellung in `moddex.env` überschrieben) oder bearbeite die Datei direkt; anschließend `moddex restart` ausführen.
 
 ### Authentifizierung
 
