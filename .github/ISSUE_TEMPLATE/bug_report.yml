@@ -1,0 +1,91 @@
+name: "🐞 Fehler melden"
+description: "Einen reproduzierbaren Fehler im Betrieb von Moddex melden"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für die Meldung! Bitte prüfe zuerst den
+        **[Troubleshooting-Guide](https://github.com/aklozyp/Moddex/blob/main/docs/troubleshooting.md)** —
+        viele Probleme (fehlendes Java, belegter Port, CORS/Security-Mode, API-Key)
+        sind dort mit Lösung beschrieben. Bitte **keine Passwörter, Tokens oder
+        API-Keys** in dieses Issue einfügen.
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Vorab-Check
+      options:
+        - label: Ich habe den Troubleshooting-Guide gelesen.
+          required: true
+        - label: Ich habe nach bestehenden Issues mit demselben Problem gesucht.
+          required: true
+        - label: Ich habe Logs/Ausgaben von Secrets bereinigt.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Moddex-Version
+      description: "Ausgabe von `moddex version` (Linux) bzw. WinSW-`status` (Windows), oder der Release-Tag."
+      placeholder: "z. B. v0.3.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Plattform
+      options:
+        - "Linux (Debian/Ubuntu)"
+        - "Linux (RHEL/Fedora)"
+        - "Linux (sonstige)"
+        - "Windows"
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Betriebsmodus
+      options:
+        - "local"
+        - "lan"
+        - "public"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Was ist passiert?
+      description: "Klare Beschreibung des Fehlers."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zum Reproduzieren
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartetes Verhalten
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevante Logs
+      description: "Backend-Log (Linux: `moddex logs`, Windows: `%ProgramData%\\Moddex\\logs`). Wird automatisch als Codeblock formatiert."
+      render: shell
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Zusätzlicher Kontext
+      description: "Java-Version (`java -version`), Reverse-Proxy, Firewall, sonstige Besonderheiten."
+    validations:
+      required: false

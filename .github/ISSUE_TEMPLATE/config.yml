@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Troubleshooting-Guide
+    url: https://github.com/aklozyp/Moddex/blob/main/docs/troubleshooting.md
+    about: "Häufige Probleme (Java, Port, Dienststart, CORS, API-Key) mit Lösungen — bitte zuerst prüfen."
+  - name: ⬆️ Upgrade- und Rollback-Anleitung
+    url: https://github.com/aklozyp/Moddex/blob/main/docs/upgrade.md
+    about: "Wie du sicher aktualisierst und im Notfall zurückrollst."
+  - name: 🛟 Support und Sicherheitsmeldungen
+    url: https://github.com/aklozyp/Moddex/blob/main/SUPPORT.md
+    about: "Wo du Hilfe bekommst und wie du Sicherheitslücken vertraulich meldest."

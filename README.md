@@ -171,6 +171,8 @@ bash update.sh
 
 The script compares `/opt/moddex/VERSION` (if present) to the latest GitHub release tag and upgrades automatically. If Moddex is not installed yet, it offers to run the installer.
 
+For manual upgrades, version verification and **rollback to a previous release** (Linux and Windows), see the **[upgrade & rollback guide](docs/upgrade.md)**.
+
 ## Command-line interface (`moddex`)
 
 The installer places an administrative CLI at `/usr/local/bin/moddex` so basic operations can be performed from the terminal without the web UI.
@@ -476,6 +478,16 @@ sudo cat /etc/moddex/moddex.env       # unchanged
 Acceptance: after the installer the service is running under systemd and the web UI is
 reachable; a second installer run upgrades the artifacts without overwriting
 `/etc/moddex/moddex.env` or any instance data under `/var/lib/moddex`.
+
+## Troubleshooting & support
+
+Common operational problems (missing/old Java, occupied port, service won't
+start, CORS/security mode, CurseForge API key, checksum mismatch) are documented
+for both Linux and Windows in the **[troubleshooting guide](docs/troubleshooting.md)**.
+
+If that does not resolve it, open an issue via the bug-report form (see
+**[SUPPORT.md](SUPPORT.md)**) and include version, platform and operating mode.
+Report security issues privately via GitHub's "Report a vulnerability".
 
 ## Contributing
 
