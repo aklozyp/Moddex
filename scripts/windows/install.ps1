@@ -116,11 +116,34 @@ function Resolve-WinSw {
 }
 
 # --- config resolution -------------------------------------------------------
+# Env names the template renders from -Mode/-Port; everything else in an existing
+# service definition was added by the operator and must survive an upgrade.
+$ManagedEnv = @(
+    'MODDEX_ROOT', 'MODDEX_CONFIG_DIR', 'MODDEX_LOG_DIR',
+    'MODDEX_MODE', 'MODDEX_SECURITY_MODE', 'SERVER_ADDRESS', 'SERVER_PORT'
+)
+
 function Get-ExistingEnv([string]$Name) {
     if (-not (Test-Path $ServiceXml)) { return $null }
     [xml]$xml = Get-Content -Path $ServiceXml -Raw
     $node = $xml.service.env | Where-Object { $_.name -eq $Name } | Select-Object -First 1
     if ($node) { return $node.value } else { return $null }
+}
+
+# Operator-added <env> entries (anything not in $ManagedEnv) from the existing
+# service definition, so a re-install/upgrade preserves them instead of dropping
+# them when the XML is re-rendered (parity with install.sh's upsert_env_key,
+# e.g. MODDEX_CORS_ALLOWED_ORIGINS).
+function Get-UnmanagedEnv {
+    if (-not (Test-Path $ServiceXml)) { return @() }
+    [xml]$existing = Get-Content -Path $ServiceXml -Raw
+    $kept = @()
+    foreach ($node in @($existing.service.env)) {
+        if ($node -and $node.name -and ($ManagedEnv -notcontains $node.name)) {
+            $kept += [pscustomobject]@{ Name = [string]$node.name; Value = [string]$node.value }
+        }
+    }
+    return $kept
 }
 
 function Resolve-Config {
@@ -200,7 +223,24 @@ $xml = $xml.Replace('@@JAVA_EXE@@', $javaExe).
             Replace('@@MODE@@', $cfg.Mode).
             Replace('@@SERVER_ADDRESS@@', $cfg.Address).
             Replace('@@SERVER_PORT@@', [string]$cfg.Port)
-Set-Content -Path $ServiceXml -Value $xml -Encoding UTF8
+
+# Re-render replaces the whole file, so carry over any operator-added <env>
+# entries from the previous definition before writing (read while the old XML is
+# still on disk). Managed keys keep coming from the template above.
+$preservedEnv = Get-UnmanagedEnv
+if ($preservedEnv.Count -gt 0) {
+    [xml]$doc = $xml
+    foreach ($extra in $preservedEnv) {
+        $node = $doc.CreateElement('env')
+        $node.SetAttribute('name', $extra.Name)
+        $node.SetAttribute('value', $extra.Value)
+        $doc.DocumentElement.AppendChild($node) | Out-Null
+        Write-Log "Preserving operator-added env entry: $($extra.Name)"
+    }
+    $doc.Save($ServiceXml)
+} else {
+    Set-Content -Path $ServiceXml -Value $xml -Encoding UTF8
+}
 
 # Place the WinSW executable next to its XML (WinSW derives the config from its
 # own file name: moddex-backend.exe -> moddex-backend.xml).
