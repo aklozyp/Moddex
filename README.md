@@ -126,7 +126,7 @@ $expected = (Get-Content moddex.zip.sha256).Split(' ')[0]
 if ((Get-FileHash moddex.zip).Hash.ToLower() -ne $expected) { throw 'Checksum mismatch' }
 Expand-Archive moddex.zip -DestinationPath moddex-$Tag
 # Install and register the service (defaults: local mode, port 8080)
-.\moddex-$Tag\scripts\windows\install.ps1 -Mode local
+& ".\moddex-$Tag\scripts\windows\install.ps1" -Mode local
 ```
 
 The installer is idempotent: re-running it upgrades `app.jar` and the frontend without touching

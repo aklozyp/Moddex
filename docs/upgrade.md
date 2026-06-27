@@ -88,7 +88,7 @@ Invoke-WebRequest "https://github.com/aklozyp/Moddex/releases/download/$Tag/modd
 $expected = (Get-Content moddex.zip.sha256).Split(' ')[0]
 if ((Get-FileHash moddex.zip).Hash.ToLower() -ne $expected) { throw 'Checksum mismatch' }
 Expand-Archive moddex.zip -DestinationPath moddex-$Tag -Force
-.\moddex-$Tag\scripts\windows\install.ps1
+& ".\moddex-$Tag\scripts\windows\install.ps1"
 ```
 
 Ohne `-Mode`/`-Port` übernimmt der Installer **Modus und Port** aus dem
