@@ -49,7 +49,7 @@ Legend: ✅ available · 🧪 experimental/unvalidated · — not yet / out of s
 |----------|--------|-------|
 | Debian 12 / Ubuntu 22.04+ | **Supported** | Primary target; native installer + systemd. |
 | Arch Linux | **Experimental** | Expected to work (systemd, OpenJDK 17+) but not validated in CI. |
-| Windows | Planned (v0.3) | Installer is a v0.3 target ([#26](https://github.com/aklozyp/Moddex/issues/26)); not a v0.2 blocker. |
+| Windows 10/11, Server 2019+ | **Supported (v0.3)** | PowerShell installer + Windows service (WinSW). See [Windows](#windows). |
 | Docker | Dev utility only | The `Docker/` files in the meta repo are for local development. Docker is **not** the supported production deployment path — install natively per below. |
 
 ## Installation
@@ -99,6 +99,48 @@ The installer prompts for the deployment mode during execution.
    ```bash
    sudo ./scripts/install.sh
    ```
+
+### Windows
+
+Windows is installed from the dedicated `moddex-<tag>-windows-x64.zip` artifact and runs the
+backend as a Windows service via [WinSW](https://github.com/winsw/winsw). Java 17+ must be on the
+`PATH` (or reachable via `JAVA_HOME`).
+
+Path layout:
+
+| Purpose | Location |
+|---------|----------|
+| Application (`app.jar`, frontend, service wrapper) | `%ProgramFiles%\Moddex` |
+| Instance data (`MODDEX_ROOT`) | `%ProgramData%\Moddex\data` |
+| Config | `%ProgramData%\Moddex\config` |
+| Logs | `%ProgramData%\Moddex\logs` |
+
+Install from an **elevated** PowerShell session:
+
+```powershell
+$Tag = 'v0.1.0'
+Invoke-WebRequest "https://github.com/aklozyp/Moddex/releases/download/$Tag/moddex-$Tag-windows-x64.zip" -OutFile moddex.zip
+Invoke-WebRequest "https://github.com/aklozyp/Moddex/releases/download/$Tag/moddex-$Tag-windows-x64.zip.sha256" -OutFile moddex.zip.sha256
+# Verify the checksum
+$expected = (Get-Content moddex.zip.sha256).Split(' ')[0]
+if ((Get-FileHash moddex.zip).Hash.ToLower() -ne $expected) { throw 'Checksum mismatch' }
+Expand-Archive moddex.zip -DestinationPath moddex-$Tag
+# Install and register the service (defaults: local mode, port 8080)
+.\moddex-$Tag\scripts\windows\install.ps1 -Mode local
+```
+
+The installer is idempotent: re-running it upgrades `app.jar` and the frontend without touching
+instance data, and preserves the machine-local mode/port unless you pass `-Mode`/`-Port` again. The
+bundled WinSW binary is checksum-pinned; the installer rejects a mismatched download.
+
+Manage the service with standard tooling:
+
+```powershell
+Get-Service moddex-backend            # status
+Restart-Service moddex-backend        # restart
+& "$env:ProgramFiles\Moddex\moddex-backend.exe" status   # WinSW status/logs
+.\scripts\windows\uninstall.ps1        # remove (add -Purge to also delete data)
+```
 
 ## Installer Options
 
