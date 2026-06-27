@@ -113,3 +113,79 @@ jobs:
             moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz.sha256
             download.sh
             download.sh.sha256
+
+  # Windows artifact (v0.3, epic #26). Runs after the Linux release exists and
+  # appends the installable Windows zip + checksum to the same GitHub Release.
+  build-package-windows:
+    needs: build-package
+    runs-on: windows-2022
+    permissions:
+      contents: write   # required for release upload
+    env:
+      TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+      CHECKOUT_TOKEN: ${{ secrets.MODDEX_CHECKOUT_TOKEN || github.token }}
+
+    steps:
+      - name: Checkout packaging repo (Moddex-build)
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex
+          ref: ${{ env.TARGET_REF }}
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-build
+
+      - name: Checkout backend repo
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Backend
+          ref: ${{ env.TARGET_REF }}
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-Backend
+
+      - name: Checkout frontend repo
+        uses: actions/checkout@v4
+        with:
+          repository: aklozyp/Moddex-Frontend
+          ref: ${{ env.TARGET_REF }}
+          token: ${{ env.CHECKOUT_TOKEN }}
+          path: Moddex-Frontend
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'Moddex-Frontend/package-lock.json'
+
+      - name: Build Windows bundle
+        shell: pwsh
+        run: Moddex-build/scripts/windows/build-bundle.ps1 -Version $env:TARGET_REF
+
+      - name: Verify checksum
+        shell: pwsh
+        run: |
+          $zip = "Moddex-build/build/moddex-$env:TARGET_REF-windows-x64.zip"
+          $expected = (Get-Content "$zip.sha256").Split(' ')[0]
+          $actual = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "Checksum mismatch: $actual != $expected" }
+
+      - name: Stage release artifacts
+        shell: pwsh
+        run: |
+          Copy-Item "Moddex-build/build/moddex-$env:TARGET_REF-windows-x64.zip" .
+          Copy-Item "Moddex-build/build/moddex-$env:TARGET_REF-windows-x64.zip.sha256" .
+
+      - name: Attach to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TARGET_REF }}
+          files: |
+            moddex-${{ env.TARGET_REF }}-windows-x64.zip
+            moddex-${{ env.TARGET_REF }}-windows-x64.zip.sha256

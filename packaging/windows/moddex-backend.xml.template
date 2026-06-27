@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WinSW service definition for the Moddex backend on Windows.
+
+  install.ps1 renders this template into %ProgramFiles%\Moddex\moddex-backend.xml,
+  substituting the @@PLACEHOLDERS@@ with the resolved install paths and the
+  machine-local mode/port. The rendered file is the single source of machine-local
+  runtime configuration on Windows (the counterpart of /etc/moddex/moddex.env on
+  Linux); a re-install preserves its existing <env> values unless -Mode/-Port is
+  passed explicitly, so unattended upgrades stay non-destructive.
+
+  The env var names match what the backend reads (see the systemd unit and
+  application.yml): MODDEX_ROOT / MODDEX_CONFIG_DIR / MODDEX_LOG_DIR / MODDEX_MODE
+  and SERVER_ADDRESS / SERVER_PORT.
+-->
+<service>
+  <id>moddex-backend</id>
+  <name>Moddex Backend</name>
+  <description>Moddex Backend API (Minecraft server manager)</description>
+
+  <!-- Resolved from the system PATH at install time; falls back to JAVA_HOME. -->
+  <executable>@@JAVA_EXE@@</executable>
+  <arguments>-jar "@@APP_DIR@@\app.jar"</arguments>
+  <workingdirectory>@@APP_DIR@@</workingdirectory>
+
+  <!-- Machine-local runtime configuration (mode/bind/port + data paths). -->
+  <env name="MODDEX_ROOT" value="@@DATA_DIR@@" />
+  <env name="MODDEX_CONFIG_DIR" value="@@CONFIG_DIR@@" />
+  <env name="MODDEX_LOG_DIR" value="@@LOG_DIR@@" />
+  <env name="MODDEX_MODE" value="@@MODE@@" />
+  <!-- Drives the backend's CORS/security policy (moddex.security.mode); must match
+       MODDEX_MODE so a lan/public install does not run with the local default. -->
+  <env name="MODDEX_SECURITY_MODE" value="@@MODE@@" />
+  <env name="SERVER_ADDRESS" value="@@SERVER_ADDRESS@@" />
+  <env name="SERVER_PORT" value="@@SERVER_PORT@@" />
+
+  <!-- Restart on crash, but treat a clean shutdown as success. -->
+  <onfailure action="restart" delay="5 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>20 sec</stoptimeout>
+
+  <!-- Roll logs by size so the service does not fill the disk over time. -->
+  <log mode="roll-by-size">
+    <logpath>@@LOG_DIR@@</logpath>
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+
+  <startmode>Automatic</startmode>
+</service>
