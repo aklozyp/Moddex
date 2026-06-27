@@ -108,6 +108,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TARGET_REF }}
+          # Auto-generate the notes body from merged PRs, grouped per
+          # .github/release.yml. The Windows job below only appends assets and
+          # leaves this body untouched.
+          generate_release_notes: true
           files: |
             moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz
             moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz.sha256
