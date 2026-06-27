@@ -82,6 +82,10 @@ Copy-Item -Path (Join-Path $frontendDist '*') -Destination (Join-Path $BundleDir
 
 # --- installer resources -----------------------------------------------------
 Write-Log 'Copying Windows installer resources'
+# Create the intermediate parents first: Copy-Item -Recurse does not reliably
+# create missing parent directories of the destination across PowerShell versions.
+New-Item -ItemType Directory -Force -Path (Join-Path $BundleDir 'scripts') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $BundleDir 'packaging') | Out-Null
 Copy-Item -Path (Join-Path $ProjectRoot 'scripts\windows') -Destination (Join-Path $BundleDir 'scripts\windows') -Recurse -Force
 Copy-Item -Path (Join-Path $ProjectRoot 'packaging\windows') -Destination (Join-Path $BundleDir 'packaging\windows') -Recurse -Force
 
