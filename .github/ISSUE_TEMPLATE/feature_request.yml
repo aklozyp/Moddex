@@ -1,0 +1,41 @@
+name: "💡 Feature vorschlagen"
+description: "Eine Verbesserung oder neue Funktion vorschlagen"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für die Idee! Bitte beschreibe das **Problem**, das du lösen willst,
+        nicht nur die gewünschte Lösung — das hilft, die beste Umsetzung zu finden.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Welches Problem löst der Vorschlag?
+      description: "Welche Situation ist heute umständlich, unmöglich oder fehleranfällig?"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Vorgeschlagene Lösung
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Erwogene Alternativen
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Betroffener Bereich
+      options:
+        - "Backend (API/Service)"
+        - "Frontend (Web-UI)"
+        - "Installer/Packaging"
+        - "Dokumentation"
+        - "Unklar / mehrere"
+    validations:
+      required: false
