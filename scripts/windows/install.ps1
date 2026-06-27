@@ -179,8 +179,13 @@ Copy-Item -Path $FrontendDir -Destination $frontendTarget -Recurse -Force
 # Record the installed version for parity with Linux (/opt/moddex/VERSION) so
 # operators can verify an upgrade (Get-Content "$env:ProgramFiles\Moddex\VERSION").
 $bundleVersion = Join-Path $BundleRoot 'VERSION'
+$versionTarget = Join-Path $AppDir 'VERSION'
 if (Test-Path $bundleVersion) {
-    Copy-Item -Path $bundleVersion -Destination (Join-Path $AppDir 'VERSION') -Force
+    Copy-Item -Path $bundleVersion -Destination $versionTarget -Force
+} else {
+    # No bundle metadata (e.g. custom -BackendJar/-FrontendDir): never leave a
+    # stale VERSION from a previous install. Match install.sh's 'dev' fallback.
+    Set-Content -Path $versionTarget -Value 'dev' -Encoding ASCII -NoNewline
 }
 
 # Render the WinSW service definition from the template.
