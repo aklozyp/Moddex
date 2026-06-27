@@ -1,5 +1,8 @@
 # Release smoke test & checklist (v0.2)
 
+> This is the pre-tag smoke gate. For the end-to-end release procedure (tagging,
+> changelog, generated notes), see [`docs/releasing.md`](../releasing.md).
+
 Before publishing a v0.2 release, the critical end-to-end flow must pass so that
 installer or core-flow regressions are caught **before** users hit them.
 

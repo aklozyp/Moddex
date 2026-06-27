@@ -421,6 +421,14 @@ The same bundle is built in CI and on tags by GitHub Actions. See
 [`docs/ci.md`](docs/ci.md) for the build matrix, the required cross-repo
 checkout secret, the release process and the Arch/Windows status.
 
+## Releases & changelog
+
+Notable changes are recorded in the **[CHANGELOG](CHANGELOG.md)**; each GitHub
+Release additionally carries auto-generated notes listing every merged pull
+request. Maintainers cutting a release should follow the
+**[release process](docs/releasing.md)** and the
+[release checklist](docs/qa/release-checklist.md).
+
 ## Quality assurance
 
 Before each release, run the recovery QA pass to make sure restore, mod changes

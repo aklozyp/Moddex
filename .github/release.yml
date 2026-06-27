@@ -1,0 +1,43 @@
+# Configuration for GitHub's automatically generated release notes.
+# Used by the `generate_release_notes: true` step in .github/workflows/release.yml:
+# merged pull requests are grouped into the categories below based on their labels.
+# See: https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+      - duplicate
+      - invalid
+      - wontfix
+    authors:
+      - dependabot
+      - github-actions
+  categories:
+    - title: 🚀 Features
+      labels:
+        - enhancement
+        - feature
+        - story
+        - epic
+    - title: 🐞 Bug Fixes
+      labels:
+        - bug
+        - fix
+    - title: 🔒 Security
+      labels:
+        - security
+    - title: 📖 Documentation
+      labels:
+        - docs
+        - documentation
+    - title: 🌐 Internationalization
+      labels:
+        - i18n
+    - title: 🔧 Build, CI & Packaging
+      labels:
+        - ci
+        - build
+        - packaging
+    - title: 🧹 Other Changes
+      labels:
+        - "*"
