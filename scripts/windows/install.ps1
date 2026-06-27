@@ -176,6 +176,13 @@ $frontendTarget = Join-Path $AppDir 'frontend'
 if (Test-Path $frontendTarget) { Remove-Item -Recurse -Force $frontendTarget }
 Copy-Item -Path $FrontendDir -Destination $frontendTarget -Recurse -Force
 
+# Record the installed version for parity with Linux (/opt/moddex/VERSION) so
+# operators can verify an upgrade (Get-Content "$env:ProgramFiles\Moddex\VERSION").
+$bundleVersion = Join-Path $BundleRoot 'VERSION'
+if (Test-Path $bundleVersion) {
+    Copy-Item -Path $bundleVersion -Destination (Join-Path $AppDir 'VERSION') -Force
+}
+
 # Render the WinSW service definition from the template.
 $templatePath = Join-Path $PackagingWin 'moddex-backend.xml.template'
 if (-not (Test-Path $templatePath)) { Die "Service template not found: $templatePath" }

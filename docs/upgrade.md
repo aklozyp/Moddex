@@ -68,8 +68,10 @@ TAG=v0.3.0
 curl -fsSLO "https://github.com/aklozyp/Moddex/releases/download/$TAG/moddex-$TAG-linux-amd64.tar.gz"
 curl -fsSLO "https://github.com/aklozyp/Moddex/releases/download/$TAG/moddex-$TAG-linux-amd64.tar.gz.sha256"
 sha256sum -c "moddex-$TAG-linux-amd64.tar.gz.sha256"
-tar xzf "moddex-$TAG-linux-amd64.tar.gz"
-sudo ./moddex-$TAG-*/scripts/install.sh
+# The tarball has no top-level wrapper directory, so extract into one you create.
+mkdir -p "moddex-$TAG"
+tar xzf "moddex-$TAG-linux-amd64.tar.gz" -C "moddex-$TAG"
+sudo ./moddex-$TAG/scripts/install.sh
 ```
 
 ---
@@ -89,9 +91,14 @@ Expand-Archive moddex.zip -DestinationPath moddex-$Tag -Force
 .\moddex-$Tag\scripts\windows\install.ps1
 ```
 
-Ohne `-Mode`/`-Port` übernimmt der Installer die bestehenden `<env>`-Werte aus
-`moddex-backend.xml`; nur `app.jar`/Frontend und die checksum-gepinnte WinSW-
-Binary werden ersetzt.
+Ohne `-Mode`/`-Port` übernimmt der Installer **Modus und Port** aus dem
+bestehenden `moddex-backend.xml`; nur `app.jar`/Frontend, die `VERSION` und die
+checksum-gepinnte WinSW-Binary werden ersetzt.
+
+> ⚠️ **Andere** manuell ergänzte `<env>`-Einträge (z. B.
+> `MODDEX_CORS_ALLOWED_ORIGINS`) werden beim Upgrade **nicht** übernommen, weil
+> die Service-XML neu aus der Vorlage erzeugt wird. Sichere `moddex-backend.xml`
+> vor dem Upgrade (Schritt 0) und trage solche Einträge danach erneut ein.
 
 ---
 
