@@ -28,6 +28,9 @@
   <env name="MODDEX_CONFIG_DIR" value="@@CONFIG_DIR@@" />
   <env name="MODDEX_LOG_DIR" value="@@LOG_DIR@@" />
   <env name="MODDEX_MODE" value="@@MODE@@" />
+  <!-- Drives the backend's CORS/security policy (moddex.security.mode); must match
+       MODDEX_MODE so a lan/public install does not run with the local default. -->
+  <env name="MODDEX_SECURITY_MODE" value="@@MODE@@" />
   <env name="SERVER_ADDRESS" value="@@SERVER_ADDRESS@@" />
   <env name="SERVER_PORT" value="@@SERVER_PORT@@" />
 
