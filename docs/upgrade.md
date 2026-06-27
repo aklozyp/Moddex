@@ -93,12 +93,12 @@ Expand-Archive moddex.zip -DestinationPath moddex-$Tag -Force
 
 Ohne `-Mode`/`-Port` übernimmt der Installer **Modus und Port** aus dem
 bestehenden `moddex-backend.xml`; nur `app.jar`/Frontend, die `VERSION` und die
-checksum-gepinnte WinSW-Binary werden ersetzt.
+checksum-gepinnte WinSW-Binary werden ersetzt. Manuell ergänzte `<env>`-Einträge
+(z. B. `MODDEX_CORS_ALLOWED_ORIGINS`) bleiben beim Upgrade **erhalten** — der
+Installer übernimmt sie aus der vorhandenen Service-XML (Parität zu Linux).
 
-> ⚠️ **Andere** manuell ergänzte `<env>`-Einträge (z. B.
-> `MODDEX_CORS_ALLOWED_ORIGINS`) werden beim Upgrade **nicht** übernommen, weil
-> die Service-XML neu aus der Vorlage erzeugt wird. Sichere `moddex-backend.xml`
-> vor dem Upgrade (Schritt 0) und trage solche Einträge danach erneut ein.
+> 💡 Trotzdem empfohlen: `moddex-backend.xml` im Backup von Schritt 0 sichern,
+> damit du im Rollback-Fall den exakten vorherigen Stand wiederherstellen kannst.
 
 ---
 

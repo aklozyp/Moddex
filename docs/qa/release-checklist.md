@@ -91,8 +91,28 @@ Tick every item before tagging a release:
       restore / mod rollback / broken modpack / full disk.
 - [ ] Re-running the installer preserves `/etc/moddex/moddex.env` and instance
       data (update-resistance).
+- [ ] **Migration paths verified** (see below): a plain upgrade keeps the
+      operator's mode/port, instance data and any operator-added config, and
+      records the new version.
 - [ ] Release notes list known limitations (experimental features, Arch/Windows
       status).
+
+### Migration verification matrix
+
+Run an upgrade (install version A, then re-run the installer for version B over
+it) and confirm each path. These are the migrations the installers implement; a
+silent regression here corrupts an existing deployment.
+
+| # | Path | Linux | Windows | Expected |
+|---|------|-------|---------|----------|
+| M1 | Mode/port preserved on plain upgrade | `install.sh` (no `--mode/--port`) | `install.ps1` (no `-Mode/-Port`) | previous mode + port unchanged |
+| M2 | Operator-added config preserved | extra keys in `moddex.env` (e.g. `MODDEX_CORS_ALLOWED_ORIGINS`) | extra `<env>` in `moddex-backend.xml` | still present after upgrade |
+| M3 | Explicit override applies, rest preserved | `--mode lan` only changes mode keys | `-Mode lan` only changes mode keys | changed key updated, others kept |
+| M4 | Instance data untouched | `/var/lib/moddex` | `%ProgramData%\Moddex\data` | unchanged |
+| M5 | Version recorded | `/opt/moddex/VERSION` | `%ProgramFiles%\Moddex\VERSION` | shows the new version |
+| M6 | Legacy systemd unit migrated (Linux only) | pre-`moddex.env` install | — | mode/port recovered from the old unit |
+
+A release is **blocked** if M1–M5 regress on either platform.
 
 A release is **blocked** if any checked smoke step fails or any 🚫 recovery row
 regresses.

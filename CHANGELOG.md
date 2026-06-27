@@ -37,6 +37,12 @@ The following work is merged on `develop` but not yet tagged in a release.
 - Windows installer now records the installed version in
   `%ProgramFiles%\Moddex\VERSION` for parity with Linux.
 
+### Fixed
+
+- Windows installer no longer drops operator-added `<env>` entries (e.g.
+  `MODDEX_CORS_ALLOWED_ORIGINS`) when re-rendering the service definition on an
+  upgrade; they are carried over, matching `install.sh`'s behaviour (#44).
+
 > _v0.2 "Public Beta Foundation" (secure local/lan/public modes with fail-closed
 > CORS and enforced authentication, the native Linux installer + systemd service +
 > `moddex` CLI, backup/restore data-safety guarantees, Modrinth mod management and

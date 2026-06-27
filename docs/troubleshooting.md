@@ -126,9 +126,8 @@ Security-Mode zum Betriebsmodus passt.
 - Stelle sicher, dass `MODDEX_SECURITY_MODE` **gleich** `MODDEX_MODE` ist.
   - Linux: in `/etc/moddex/moddex.env`.
   - Windows: in `%ProgramFiles%\Moddex\moddex-backend.xml` (`<env>`-Einträge).
-    Beachte: Auf Windows werden manuell ergänzte `<env>`-Einträge (z. B.
-    `MODDEX_CORS_ALLOWED_ORIGINS`) bei einem Upgrade **nicht** automatisch
-    übernommen — siehe [Upgrade-Hinweis](upgrade.md#upgrade--windows).
+    Manuell ergänzte `<env>`-Einträge (z. B. `MODDEX_CORS_ALLOWED_ORIGINS`)
+    bleiben bei einem Upgrade erhalten — siehe [Upgrade-Hinweis](upgrade.md#upgrade--windows).
 - Bevorzugt: Web-UI und API über **dieselbe** Origin hinter einem Reverse Proxy
   ausliefern (nginx-Beispiel im [README](../README.md)) — dann entfällt CORS.
 
