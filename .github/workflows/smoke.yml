@@ -26,6 +26,10 @@ concurrency:
   group: moddex-smoke-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: builds and boots a throwaway backend; never writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-22.04

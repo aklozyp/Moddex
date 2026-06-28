@@ -434,6 +434,10 @@ request. Maintainers cutting a release should follow the
 Before each release, run the recovery QA pass to make sure restore, mod changes
 and file operations cannot silently destroy instances:
 
+- **Security review:** [`docs/qa/security-review.md`](docs/qa/security-review.md)
+  — the pre-release review across backend, frontend and CI (auth, CORS,
+  file/download, secret handling, XSS, workflow permissions). See also
+  [`SECURITY.md`](SECURITY.md) for vulnerability reporting.
 - **Manual matrix:** [`docs/qa/recovery-checklist.md`](docs/qa/recovery-checklist.md)
   — versioned checklist covering backup → restore → start, mod-install rollback,
   broken modpacks, full-disk/aborted-download scenarios and a fresh-install smoke
