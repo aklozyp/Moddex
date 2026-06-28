@@ -309,8 +309,11 @@ server {
         proxy_pass         http://127.0.0.1:8080;
         proxy_set_header   Host $host;
         proxy_set_header   X-Real-IP $remote_addr;
-        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+        # Overwrite (do NOT append) so a client cannot inject a spoofed leftmost
+        # entry, and clear the RFC Forwarded header the backend also honours.
+        proxy_set_header   X-Forwarded-For $remote_addr;
         proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   Forwarded "";
     }
 
     # Statische Frontend-Assets direkt ausliefern (optional, performanter)
@@ -327,6 +330,13 @@ server {
 ```
 
 Für Caddy ist `reverse_proxy localhost:8080` mit automatischem TLS über Let's Encrypt ausreichend.
+
+Damit das Backend die echte Client-IP (für Login-Rate-Limit und Audit-Log) aus
+dem Proxy übernimmt, muss `MODDEX_FORWARD_HEADERS_STRATEGY=framework` gesetzt
+sein — **nur** hinter einem Proxy, der wie oben *alle* Forwarded-Header
+überschreibt/leert. Ohne Proxy (Direkt-Exposition) bleibt der sichere Default
+`none`, sonst könnten Clients ihre IP fälschen. Siehe
+`Moddex-Backend/docs/security-configuration.md`.
 
 ### Backup
 

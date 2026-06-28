@@ -28,7 +28,7 @@ gaps and several Low/Info hardening items.
 | ID | Severity | Area | Finding | Status |
 |----|----------|------|---------|--------|
 | B1 | Medium | Backend | `serversettings.json` (JWT secret, admin hash, API key) written with default file permissions | **Fixed** — backend PR |
-| B2 | Medium | Backend | `X-Forwarded-For` trusted unconditionally → IP spoofing when directly exposed in `public` mode | Tracked — [#47](https://github.com/aklozyp/Moddex/issues/47) |
+| B2 | Medium | Backend | `X-Forwarded-For` trusted unconditionally → IP spoofing when directly exposed in `public` mode | **Fixed** — backend PR ([#47](https://github.com/aklozyp/Moddex/issues/47)) |
 | F1 | Low | Frontend | Unused `SafeHtmlPipe` (`bypassSecurityTrustHtml`) — latent XSS footgun | **Fixed** — frontend PR |
 | F2 | Low | Frontend | No Content-Security-Policy | **Fixed** — frontend PR |
 | C1 | Medium | CI | `ci.yml`/`smoke.yml` had no least-privilege `permissions` | **Fixed** — this PR |
@@ -57,7 +57,7 @@ explicit mode. Defense in depth: the file should be owner-only (`0600`).
 **Recommendation / fix:** after writing, set POSIX permissions `rw-------` on the
 settings file (skip gracefully on non-POSIX/Windows). Implemented in the backend.
 
-### B2 — Unconditional trust of forwarded client IP (Medium)
+### B2 — Unconditional trust of forwarded client IP (Medium → Fixed)
 
 `application.yml` sets `server.forward-headers-strategy: framework`, so
 `request.remoteAddr` reflects client-supplied `X-Forwarded-For`. Behind a
@@ -66,9 +66,13 @@ directly (the installer permits `--mode public` binding `0.0.0.0`) an attacker
 can spoof the header to evade the login rate-limiter (keyed on `remoteAddr`) and
 forge audit-log client IPs.
 
-**Recommendation:** require a header-sanitising reverse proxy for `public` mode,
-and/or make forwarded-header trust opt-in via a trusted-proxy setting. Needs a
-design decision — tracked in [#47](https://github.com/aklozyp/Moddex/issues/47).
+**Fixed:** `forward-headers-strategy` now defaults to `none` — the client IP
+comes from the direct socket and forwarded headers are not trusted. Operators
+behind a reverse proxy that overwrites/clears *all* forwarded headers opt back
+in via `MODDEX_FORWARD_HEADERS_STRATEGY=framework`
+(see `Moddex-Backend/docs/security-configuration.md` and the reverse-proxy
+section in this README). Tracked in
+[#47](https://github.com/aklozyp/Moddex/issues/47).
 
 ### Strengths confirmed
 
@@ -148,8 +152,8 @@ Added `SECURITY.md` with a private vulnerability-reporting policy (referenced by
 ### C4 — No dependency scanning (Low → Fixed here, follow-up for app repos)
 
 Added `.github/dependabot.yml` for the GitHub Actions ecosystem in this repo.
-Equivalent Maven (backend) and npm (frontend) Dependabot configs should be added
-in those repositories.
+Equivalent Maven (backend) and npm (frontend) Dependabot configs were added in
+those repositories alongside the B1 and F1/F2 fixes.
 
 ### Strengths confirmed
 
@@ -168,6 +172,6 @@ in those repositories.
 | B1 | Backend PR (this review) |
 | F1, F2 | Frontend PR (this review) |
 | C1, C3, C4 | This (meta) PR |
-| B2 | [#47](https://github.com/aklozyp/Moddex/issues/47) |
+| B2 | Backend PR ([#47](https://github.com/aklozyp/Moddex/issues/47)) |
 | C2 | Recommendation — apply with Dependabot follow-up |
 | B3, F3 | Accepted, documented |
