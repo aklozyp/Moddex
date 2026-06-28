@@ -1,0 +1,16 @@
+# Dependabot keeps the CI/release GitHub Actions in this repository up to date so
+# a known-vulnerable action version does not linger. The backend (Maven) and
+# frontend (npm) dependencies are tracked by equivalent configs in their own
+# repositories.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - ci
+      - dependencies

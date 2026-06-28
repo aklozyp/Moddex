@@ -37,6 +37,13 @@ The following work is merged on `develop` but not yet tagged in a release.
 - Windows installer now records the installed version in
   `%ProgramFiles%\Moddex\VERSION` for parity with Linux.
 
+### Security
+
+- Pre-release security review across all three repositories
+  ([docs/qa/security-review.md](docs/qa/security-review.md), #46); added
+  `SECURITY.md`, least-privilege `permissions` on the CI/smoke workflows and a
+  Dependabot config for GitHub Actions.
+
 ### Fixed
 
 - Windows installer no longer drops operator-added `<env>` entries (e.g.

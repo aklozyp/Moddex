@@ -27,6 +27,12 @@ concurrency:
   group: moddex-ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege: this workflow only checks out code and builds. It never writes
+# to the repo, so the default GITHUB_TOKEN is dropped to read-only. (The private
+# cross-repo checkouts use MODDEX_CHECKOUT_TOKEN, not this token.)
+permissions:
+  contents: read
+
 jobs:
   build:
     strategy:
