@@ -47,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout packaging repo (Moddex-build)
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -55,7 +55,7 @@ jobs:
           path: Moddex-build
 
       - name: Checkout backend repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Backend
           ref: tests
@@ -63,7 +63,7 @@ jobs:
           path: Moddex-Backend
 
       - name: Checkout frontend repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Frontend
           ref: tests
@@ -71,14 +71,14 @@ jobs:
           path: Moddex-Frontend
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -101,7 +101,7 @@ jobs:
           Moddex-build/scripts/build-bundle.sh
 
       - name: Upload bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: moddex-bundle-${{ matrix.os }}
           path: |
@@ -121,7 +121,7 @@ jobs:
 
     steps:
       - name: Checkout packaging repo (Moddex-build)
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -129,7 +129,7 @@ jobs:
           path: Moddex-build
 
       - name: Checkout backend repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Backend
           ref: tests
@@ -137,7 +137,7 @@ jobs:
           path: Moddex-Backend
 
       - name: Checkout frontend repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Frontend
           ref: tests
@@ -145,14 +145,14 @@ jobs:
           path: Moddex-Frontend
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -163,7 +163,7 @@ jobs:
         run: Moddex-build/scripts/windows/build-bundle.ps1 -Version $env:VERSION
 
       - name: Upload Windows bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: moddex-bundle-windows
           path: |

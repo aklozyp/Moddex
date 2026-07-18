@@ -32,7 +32,7 @@ gaps and several Low/Info hardening items.
 | F1 | Low | Frontend | Unused `SafeHtmlPipe` (`bypassSecurityTrustHtml`) — latent XSS footgun | **Fixed** — frontend PR |
 | F2 | Low | Frontend | No Content-Security-Policy | **Fixed** — frontend PR |
 | C1 | Medium | CI | `ci.yml`/`smoke.yml` had no least-privilege `permissions` | **Fixed** — this PR |
-| C2 | Low | CI | Actions pinned by mutable tag, not commit SHA | Recommendation (below) |
+| C2 | Low | CI | Actions pinned by mutable tag, not commit SHA | **Fixed** — [#52](https://github.com/aklozyp/Moddex/issues/52) |
 | C3 | Low | Repo | No `SECURITY.md` disclosure policy | **Fixed** — this PR |
 | C4 | Low | Repo | No Dependabot / dependency scanning | **Fixed** (meta) — this PR |
 | B3 | Info | Backend | Console WebSocket auth via token query param | Accepted (documented) |
@@ -136,13 +136,17 @@ default `GITHUB_TOKEN` scope. Both only read code and build. Added
 `permissions: contents: read`. (`release.yml` already scopes `contents: write`
 per job.)
 
-### C2 — Actions pinned by tag, not SHA (Low — recommendation)
+### C2 — Actions pinned by tag, not SHA (Low → Fixed)
 
-Workflows reference `actions/checkout@v4`, `softprops/action-gh-release@v2`, etc.
-A compromised tag could inject malicious action code. Pinning to full commit SHAs
-(especially for the third-party `softprops/action-gh-release`) removes that risk.
-Left as a recommendation to avoid mass churn; Dependabot (C4) keeps the pins
-current once applied.
+Workflows referenced `actions/checkout@v4`, `softprops/action-gh-release@v2`,
+etc. A compromised tag could inject malicious action code with access to
+`MODDEX_CHECKOUT_TOKEN`. Pinning to full commit SHAs (especially for the
+third-party `softprops/action-gh-release`) removes that risk.
+
+**Fixed** ([#52](https://github.com/aklozyp/Moddex/issues/52)): every `uses:`
+in `ci.yml`, `smoke.yml` and `release.yml` is pinned to the full commit SHA of
+the previously used version tag (annotated `# v4`/`# v2`). Dependabot (C4)
+keeps the pins current.
 
 ### C3 — No SECURITY.md (Low → Fixed)
 
