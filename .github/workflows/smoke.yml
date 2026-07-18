@@ -41,14 +41,14 @@ jobs:
 
     steps:
       - name: Checkout packaging repo (Moddex-build)
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex
           token: ${{ env.CHECKOUT_TOKEN }}
           path: Moddex-build
 
       - name: Checkout backend repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Backend
           ref: ${{ inputs.backend_ref }}
@@ -56,7 +56,7 @@ jobs:
           path: Moddex-Backend
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
         with:
           distribution: temurin
           java-version: '21'
