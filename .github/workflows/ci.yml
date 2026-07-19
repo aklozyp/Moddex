@@ -116,6 +116,14 @@ jobs:
           cache-dependency-path: 'Moddex-Frontend/package-lock.json'
 
       - name: Backend tests
+        # Writable Moddex dirs: the context-load test boots the full app, whose
+        # JwtService persists its secret into the config dir (default
+        # /etc/moddex, not writable on hosted runners). Mirrors smoke.yml
+        # (Moddex-Backend#55).
+        env:
+          MODDEX_ROOT: ${{ runner.temp }}/moddex-data
+          MODDEX_CONFIG_DIR: ${{ runner.temp }}/moddex-cfg
+          MODDEX_LOG_DIR: ${{ runner.temp }}/moddex-log
         run: |
           chmod +x Moddex-Backend/mvnw
           Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pci test

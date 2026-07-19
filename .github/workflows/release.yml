@@ -96,6 +96,11 @@ jobs:
       # Fast confidence check before producing a release artifact. The full test
       # matrix runs in ci.yml; here we re-run the no-network backend tests only.
       - name: Run backend tests
+        # Writable Moddex dirs for the full-context test (Moddex-Backend#55).
+        env:
+          MODDEX_ROOT: ${{ runner.temp }}/moddex-data
+          MODDEX_CONFIG_DIR: ${{ runner.temp }}/moddex-cfg
+          MODDEX_LOG_DIR: ${{ runner.temp }}/moddex-log
         run: |
           chmod +x Moddex-Backend/mvnw
           Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pci test
