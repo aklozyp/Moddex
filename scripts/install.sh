@@ -142,6 +142,25 @@ case "$MODE" in
   *) die "Invalid --mode value: $MODE (expected local, lan, or public)" ;;
 esac
 
+# Public mode serves plain HTTP unless the operator sets up TLS (reverse proxy
+# or the backend's native MODDEX_TLS_*): warn loudly and, when a human newly
+# chooses public interactively, require confirmation (Moddex-Backend#50).
+# Unattended runs (upgrades inheriting mode, explicit --mode in scripts) only
+# warn, so automation keeps working.
+if [[ "$MODE" == "public" ]]; then
+  log "WARNING: --mode public serves the admin login and ALL API traffic over plain HTTP."
+  log "         Passwords and session tokens are readable on the network until you either"
+  log "         terminate TLS in a reverse proxy (see the README; then set MODDEX_TLS_TERMINATED=true)"
+  log "         or enable native HTTPS via MODDEX_TLS_ENABLED/MODDEX_TLS_CERT/MODDEX_TLS_KEY."
+  if [[ -t 0 && "$EXISTING_MODE" != "public" ]]; then
+    read -r -p "Continue with public mode over plain HTTP? [y/N] " tls_answer
+    case "${tls_answer,,}" in
+      y|yes) ;;
+      *) die "Aborted. Re-run with --mode lan/local, or set up TLS first (see README)." ;;
+    esac
+  fi
+fi
+
 if [[ -z "$BACKEND_JAR" ]]; then
   DEFAULT_JAR="$PROJECT_ROOT/backend/Moddex-Backend.jar"
   [[ -f "$DEFAULT_JAR" ]] || die "Backend JAR not found. Provide --backend-jar."
@@ -257,6 +276,12 @@ MODDEX_CONFIG_DIR=$CONFIG_DIR
 MODDEX_LOG_DIR=$LOG_DIR
 SERVER_ADDRESS=$SERVER_ADDRESS
 SERVER_PORT=$SERVER_PORT
+# Transport security (Moddex-Backend#50). Behind a TLS-terminating reverse
+# proxy declare it; without a proxy enable native HTTPS with a PEM cert/key.
+#MODDEX_TLS_TERMINATED=true
+#MODDEX_TLS_ENABLED=true
+#MODDEX_TLS_CERT=/etc/letsencrypt/live/example.com/fullchain.pem
+#MODDEX_TLS_KEY=/etc/letsencrypt/live/example.com/privkey.pem
 EOF
   umask 022
   chown root:moddex "$ENV_FILE"

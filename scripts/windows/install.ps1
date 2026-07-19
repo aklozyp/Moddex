@@ -183,6 +183,25 @@ if (-not (Test-Path $FrontendDir)) { Die "Frontend assets not found: $FrontendDi
 $cfg = Resolve-Config
 Write-Log "Mode=$($cfg.Mode) Address=$($cfg.Address) Port=$($cfg.Port)"
 
+# Public mode serves plain HTTP unless the operator sets up TLS (reverse proxy
+# or the backend's native MODDEX_TLS_*): warn loudly and, when a human newly
+# chooses public, require confirmation (Moddex-Backend#50). Upgrades that
+# inherit an existing public mode, and automation (MODDEX_INSTALL_ASSUME_YES=1
+# or a non-interactive session), only get the warning.
+if ($cfg.Mode -eq 'public') {
+    Write-Log 'WARNING: public mode serves the admin login and ALL API traffic over plain HTTP.'
+    Write-Log '         Passwords and session tokens are readable on the network until you terminate TLS'
+    Write-Log '         in a reverse proxy (then set MODDEX_TLS_TERMINATED=true) or enable native HTTPS'
+    Write-Log '         via MODDEX_TLS_ENABLED/MODDEX_TLS_CERT/MODDEX_TLS_KEY.'
+    $existingMode = Get-ExistingEnv 'MODDEX_MODE'
+    if ($existingMode -ne 'public' -and [Environment]::UserInteractive -and -not $env:MODDEX_INSTALL_ASSUME_YES) {
+        $tlsAnswer = Read-Host 'Continue with public mode over plain HTTP? [y/N]'
+        if ($tlsAnswer -notmatch '^(?i)y(es)?$') {
+            Die 'Aborted. Re-run with -Mode lan/local, or set up TLS first (see README).'
+        }
+    }
+}
+
 foreach ($dir in @($AppDir, $DataDir, $ConfigDir, $LogDir)) {
     New-Item -ItemType Directory -Force -Path $dir | Out-Null
 }
