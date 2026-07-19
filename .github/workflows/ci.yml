@@ -22,10 +22,29 @@ on:
   pull_request:
     branches: [develop, tests, main]
   workflow_dispatch:
+    inputs:
+      backend_ref:
+        description: 'Moddex-Backend ref (branch, tag or SHA). Empty = branch default (main -> main, else tests).'
+        required: false
+        default: ''
+        type: string
+      frontend_ref:
+        description: 'Moddex-Frontend ref (branch, tag or SHA). Empty = branch default (main -> main, else tests).'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: moddex-ci-${{ github.ref }}
   cancel-in-progress: true
+
+# Cross-repo refs (#53): builds validating `main` of this repo check out `main`
+# of the app repos (reproducible release-line builds); everything else tracks
+# the app repos' integration branch `tests`. workflow_dispatch can override
+# both. The resolved refs + SHAs are written to the job summary.
+env:
+  BACKEND_REF: ${{ inputs.backend_ref || ((github.base_ref || github.ref_name) == 'main' && 'main' || 'tests') }}
+  FRONTEND_REF: ${{ inputs.frontend_ref || ((github.base_ref || github.ref_name) == 'main' && 'main' || 'tests') }}
 
 # Least privilege: this workflow only checks out code and builds. It never writes
 # to the repo, so the default GITHUB_TOKEN is dropped to read-only. (The private
@@ -58,7 +77,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Backend
-          ref: tests
+          ref: ${{ env.BACKEND_REF }}
           token: ${{ env.CHECKOUT_TOKEN }}
           path: Moddex-Backend
 
@@ -66,9 +85,21 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Frontend
-          ref: tests
+          ref: ${{ env.FRONTEND_REF }}
           token: ${{ env.CHECKOUT_TOKEN }}
           path: Moddex-Frontend
+
+      - name: Record checked-out refs in job summary
+        shell: bash
+        run: |
+          {
+            echo "### Checked-out refs"
+            echo "| Repo | Ref | SHA |"
+            echo "|------|-----|-----|"
+            echo "| Moddex-build | \`${{ github.event.pull_request.head.sha || github.sha }}\` | \`$(git -C Moddex-build rev-parse HEAD)\` |"
+            echo "| Moddex-Backend | \`${BACKEND_REF}\` | \`$(git -C Moddex-Backend rev-parse HEAD)\` |"
+            echo "| Moddex-Frontend | \`${FRONTEND_REF}\` | \`$(git -C Moddex-Frontend rev-parse HEAD)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Java
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
@@ -132,7 +163,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Backend
-          ref: tests
+          ref: ${{ env.BACKEND_REF }}
           token: ${{ env.CHECKOUT_TOKEN }}
           path: Moddex-Backend
 
@@ -140,9 +171,21 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: aklozyp/Moddex-Frontend
-          ref: tests
+          ref: ${{ env.FRONTEND_REF }}
           token: ${{ env.CHECKOUT_TOKEN }}
           path: Moddex-Frontend
+
+      - name: Record checked-out refs in job summary
+        shell: bash
+        run: |
+          {
+            echo "### Checked-out refs"
+            echo "| Repo | Ref | SHA |"
+            echo "|------|-----|-----|"
+            echo "| Moddex-build | \`${{ github.event.pull_request.head.sha || github.sha }}\` | \`$(git -C Moddex-build rev-parse HEAD)\` |"
+            echo "| Moddex-Backend | \`${BACKEND_REF}\` | \`$(git -C Moddex-Backend rev-parse HEAD)\` |"
+            echo "| Moddex-Frontend | \`${FRONTEND_REF}\` | \`$(git -C Moddex-Frontend rev-parse HEAD)\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Java
         uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4

@@ -1,8 +1,12 @@
 name: smoke
 
-# Manual pre-release smoke test. Builds and boots the backend on loopback with a
+# Pre-release smoke test. Builds and boots the backend on loopback with a
 # throwaway data directory, then runs scripts/release-smoke-test.sh against it.
 # See docs/qa/release-checklist.md.
+#
+# Runs manually (workflow_dispatch) and as a reusable workflow: release.yml
+# calls it as a mandatory gate before building release artifacts (#53), so
+# every v* tag is smoke-tested automatically.
 #
 # Cross-repo checkout: Moddex-Backend is private, so set MODDEX_CHECKOUT_TOKEN
 # (see docs/ci.md). By default the instance-create + backup steps are skipped
@@ -18,6 +22,16 @@ on:
         type: boolean
       backend_ref:
         description: 'Moddex-Backend ref to build & test (branch, tag or SHA). Set to the release candidate when gating a release.'
+        required: false
+        default: tests
+        type: string
+  workflow_call:
+    inputs:
+      full:
+        required: false
+        default: false
+        type: boolean
+      backend_ref:
         required: false
         default: tests
         type: string

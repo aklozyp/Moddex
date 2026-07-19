@@ -34,6 +34,21 @@ permission error.
 Triggers: push and pull requests to `develop`, `tests`, `main`, plus manual
 dispatch.
 
+### Cross-repo refs
+
+The backend/frontend checkouts are resolved per branch
+([#53](https://github.com/aklozyp/Moddex/issues/53)): builds validating `main`
+of this repo check out `main` of the app repos (reproducible release-line
+builds); every other branch tracks the app repos' integration branch `tests`.
+Manual dispatch accepts explicit `backend_ref`/`frontend_ref` overrides. The
+resolved refs and their commit SHAs are recorded in the job summary of every
+run.
+
+The app repos additionally run their own slim test workflows on every push/PR
+(`Moddex-Backend`: `mvnw -Pci test`; `Moddex-Frontend`: headless unit tests,
+theme-contrast audit and AOT production build), so changes there are validated
+without waiting for this repo's bundle build.
+
 For every change it runs, across a runner matrix:
 
 - backend tests (`mvnw -Pci test`),
@@ -69,8 +84,13 @@ All three repositories must carry the release tag (or you pass the ref via
 runner so the artifact links against the oldest still-supported glibc and runs
 on the broadest range of Debian/Ubuntu targets.
 
-Steps: checkout all three repos at the tag → backend tests → `build-bundle.sh`
-→ verify the SHA256 checksum → publish a GitHub Release with:
+The release smoke test (`smoke.yml`, called as a reusable workflow) runs first
+as a **mandatory gate** ([#53](https://github.com/aklozyp/Moddex/issues/53)):
+no release artifact is built unless the backend boots and passes
+`scripts/release-smoke-test.sh` at the release ref.
+
+Steps: smoke gate → checkout all three repos at the tag → backend tests →
+`build-bundle.sh` → verify the SHA256 checksum → publish a GitHub Release with:
 
 - `moddex-<tag>-linux-amd64.tar.gz` (versioned bundle),
 - `moddex-<tag>-linux-amd64.tar.gz.sha256`,
