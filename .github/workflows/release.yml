@@ -1,8 +1,9 @@
 name: release
 
-# Tag-driven release pipeline. Builds the backend JAR and the frontend bundle
-# from the three Moddex repositories, assembles the installable Linux artifact
-# with a SHA256 checksum and publishes a GitHub Release.
+# Tag-driven release pipeline. Runs the release smoke test as a mandatory gate
+# (#53), then builds the backend JAR and the frontend bundle from the three
+# Moddex repositories, assembles the installable Linux artifact with a SHA256
+# checksum and publishes a GitHub Release.
 #
 # Cross-repo checkout: aklozyp/Moddex is public, but Moddex-Backend and
 # Moddex-Frontend are private, so the default GITHUB_TOKEN cannot read them. Set
@@ -30,7 +31,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Mandatory pre-release gate (#53): the release smoke test (build + boot the
+  # backend, run scripts/release-smoke-test.sh) must pass before any release
+  # artifact is built. Reuses smoke.yml against the release ref.
+  smoke:
+    uses: ./.github/workflows/smoke.yml
+    with:
+      backend_ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+    secrets: inherit
+    permissions:
+      contents: read
+
   build-package:
+    needs: smoke
     runs-on: ubuntu-22.04
     permissions:
       contents: write   # required for release upload
