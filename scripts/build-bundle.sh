@@ -84,10 +84,28 @@ copy_dir() {
 # output of a previous run, for instance — and clearing the directory first
 # would delete the very inputs this run was asked to package.
 STAGING_DIR=""
-cleanup_staging() { [[ -n "${STAGING_DIR}" && -d "${STAGING_DIR}" ]] && rm -rf "${STAGING_DIR}"; }
+
+# An EXIT trap's status becomes the script's status, so this must never end on a
+# failed test: with nothing to clean up, a `[[ ... ]] && rm` one-liner would turn
+# every successful build into exit 1.
+cleanup_staging() {
+  if [[ -n "${STAGING_DIR}" && -d "${STAGING_DIR}" ]]; then
+    rm -rf "${STAGING_DIR}"
+  fi
+  return 0
+}
 trap cleanup_staging EXIT
 
-abs_path() { (cd "$(dirname "$1")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$1")"); }
+# Fully canonicalised path, symlinks included. Resolving only the parent would
+# leave a symlink whose target sits inside build/ looking like an outside path,
+# and the wipe below would delete it.
+abs_path() {
+  if readlink -f / >/dev/null 2>&1; then
+    readlink -f "$1"
+  else
+    (cd "$(dirname "$1")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$1")")
+  fi
+}
 
 is_inside_build_dir() {
   local resolved build_resolved
