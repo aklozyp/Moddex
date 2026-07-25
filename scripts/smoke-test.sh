@@ -82,6 +82,47 @@ else
   exit 1
 fi
 
+# --- 1b. Web UI delivery (Moddex#59) ---
+# The backend serves the built UI on this same port. Before that existed, an
+# installation could pass every API check here and still have no usable browser
+# interface, so these checks exist to make that state impossible to miss.
+ui_body="$(curl -s "${BASE_URL}/" || true)"
+ui_code=$(http_status GET /)
+ui_type=$(curl -s -o /dev/null -w '%{content_type}' "${BASE_URL}/" || true)
+
+if [[ "$ui_code" == "200" && "$ui_type" == text/html* ]]; then
+  ok "web UI served at / (200 $ui_type)"
+elif [[ "$ui_code" == "404" ]]; then
+  bad "no web UI at / (404) — the bundle installed no frontend, or nothing serves it"
+else
+  bad "unexpected response for / ($ui_code $ui_type)"
+fi
+
+if [[ -n "$ui_body" ]] && printf '%s' "$ui_body" | grep -qi '<app-root'; then
+  ok "app shell present in the served document"
+else
+  bad "document at / does not contain the Angular app shell"
+fi
+
+# A client-side route must deliver the same shell: without the SPA fallback a
+# bookmark or refresh on /login 404s even though the app itself works.
+login_code=$(http_status GET /login)
+login_type=$(curl -s -o /dev/null -w '%{content_type}' "${BASE_URL}/login" || true)
+if [[ "$login_code" == "200" && "$login_type" == text/html* ]]; then
+  ok "client-side route /login falls back to the app shell (200)"
+else
+  bad "client-side route /login not served ($login_code $login_type)"
+fi
+
+# The inverse rule: a missing asset must not be answered with the shell, or the
+# browser reports a syntax error in "JavaScript" that is really HTML.
+missing_code=$(http_status GET /this-asset-does-not-exist.js)
+if [[ "$missing_code" == "404" ]]; then
+  ok "missing asset returns 404 (no SPA fallback for assets)"
+else
+  bad "missing asset returned $missing_code instead of 404 — SPA fallback is too greedy"
+fi
+
 # --- 2. Auth enforcement: a protected endpoint must reject anonymous calls ---
 anon=$(http_status GET /api/v1/instance)
 if [[ "$anon" == "401" || "$anon" == "403" ]]; then

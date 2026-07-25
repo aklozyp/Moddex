@@ -242,8 +242,8 @@ Verzeichnisstruktur nach der Installation:
 | Pfad | Berechtigungen | Inhalt |
 |------|---------------|--------|
 | `/opt/moddex/` | `0755 moddex:moddex` | Anwendungsdateien (`app.jar`, `VERSION`) |
+| `/opt/moddex/ui/` | `0755 root:root` | Gebaute Web-UI, vom Backend ausgeliefert; fuer den Dienst nur lesbar |
 | `/var/lib/moddex/` | `0755 moddex:moddex` | Laufzeitdaten (Datenbank, Instanz- und Backup-Daten) |
-| `/var/lib/moddex/ui/` | `0755 moddex:moddex` | Statische Frontend-Assets |
 | `/var/log/moddex/` | `0755 moddex:moddex` | Backend-Logs (`backend.out.log`, `backend.err.log`) |
 | `/etc/moddex/` | `0750 root:moddex` | Maschinen-lokale Konfiguration |
 | `/etc/moddex/moddex.env` | `0640 root:moddex` | Betriebsmodus, Bind-Adresse, Port (vom Installer geschrieben) |
@@ -322,10 +322,9 @@ server {
         proxy_set_header   Forwarded "";
     }
 
-    # Statische Frontend-Assets direkt ausliefern (optional, performanter)
-    # location /assets/ {
-    #     root /var/lib/moddex/ui;
-    # }
+    # Ein separater Webserver fuer das Frontend ist nicht noetig: das Backend
+    # liefert die UI auf demselben Port wie die API aus (Moddex#59). Der Proxy
+    # oben reicht sowohl die Oberflaeche als auch die API durch.
 }
 
 server {
