@@ -41,11 +41,11 @@ function Get-Status([string]$Path) {
     } catch { return 0 }
 }
 
-Info "Installing Moddex (local mode, port $Port) …"
+Info "Installing Moddex (local mode, port $Port) ..."
 & (Join-Path $ScriptDir 'install.ps1') -Mode local -Port $Port
 
 # Wait for the backend to answer (Spring Boot start can take a while).
-Info 'Waiting for the backend to become reachable …'
+Info 'Waiting for the backend to become reachable ...'
 $reachable = $false
 for ($i = 0; $i -lt 60; $i++) {
     $code = Get-Status '/api/v1/setup/status'
@@ -63,7 +63,7 @@ else { Bad "service not running: $(if ($svc) { $svc.Status } else { 'absent' })"
 # Protected endpoint must reject anonymous access.
 $anon = Get-Status '/api/v1/instance'
 if ($anon -eq 401 -or $anon -eq 403) { Ok "auth enforced (/instance -> $anon without a token)" }
-elseif ($anon -eq 200) { Bad '/instance served WITHOUT a token (200) — auth not enforced' }
+elseif ($anon -eq 200) { Bad '/instance served WITHOUT a token (200) - auth not enforced' }
 else { Info "unexpected anonymous status for /instance: $anon (continuing)" }
 
 Info "Data:   $(Join-Path $env:ProgramData 'Moddex\data')"
@@ -71,7 +71,7 @@ Info "Config: $(Join-Path $env:ProgramData 'Moddex\config')"
 Info "Logs:   $(Join-Path $env:ProgramData 'Moddex\logs')"
 
 if (-not $KeepInstalled) {
-    Info 'Uninstalling (purge) …'
+    Info 'Uninstalling (purge) ...'
     & (Join-Path $ScriptDir 'uninstall.ps1') -Purge
 }
 
