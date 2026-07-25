@@ -27,6 +27,10 @@
   <env name="MODDEX_ROOT" value="@@DATA_DIR@@" />
   <env name="MODDEX_CONFIG_DIR" value="@@CONFIG_DIR@@" />
   <env name="MODDEX_LOG_DIR" value="@@LOG_DIR@@" />
+  <!-- Built web UI, served by the backend on the same port as the API
+       (Moddex#59). Without this the backend falls back to its Linux default
+       (/opt/moddex/ui) and a Windows install serves no browser interface. -->
+  <env name="MODDEX_UI_DIR" value="@@UI_DIR@@" />
   <env name="MODDEX_MODE" value="@@MODE@@" />
   <!-- Drives the backend's CORS/security policy (moddex.security.mode); must match
        MODDEX_MODE so a lan/public install does not run with the local default. -->

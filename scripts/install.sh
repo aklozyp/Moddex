@@ -391,7 +391,15 @@ fi
 
 log "Reloading systemd and starting backend"
 systemctl daemon-reload
-systemctl enable --now moddex-backend.service
+systemctl enable moddex-backend.service
+# `enable --now` starts a stopped unit but does not restart a running one, so an
+# upgrade would leave the old JVM serving the old JAR and the old environment.
+# That is bad enough on its own; combined with the UI migration above it is
+# worse, because the previous UI directory is already gone while the running
+# process does not know about the new one. An explicit restart is the only thing
+# that makes an upgrade take effect. (Staging, readiness and rollback around
+# this are tracked in #62.)
+systemctl restart moddex-backend.service
 
 if [[ "$MODE" != "local" ]]; then
   if command -v ufw >/dev/null 2>&1; then

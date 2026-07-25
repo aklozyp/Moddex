@@ -55,6 +55,10 @@ $PortExplicit = $PSBoundParameters.ContainsKey('Port')
 # --- constants ---------------------------------------------------------------
 $ServiceId   = 'moddex-backend'
 $AppDir      = Join-Path $env:ProgramFiles 'Moddex'
+# Built web UI, served by the backend on the same port as the API (Moddex#59).
+# Mirrors the Linux layout (/opt/moddex/ui): it lives with the application, not
+# with the instance data, because an upgrade replaces it wholesale.
+$UiDir       = Join-Path $AppDir 'ui'
 $DataRoot    = Join-Path $env:ProgramData 'Moddex'
 $DataDir     = Join-Path $DataRoot 'data'
 $ConfigDir   = Join-Path $DataRoot 'config'
@@ -246,9 +250,16 @@ if (Get-Service -Name $ServiceId -ErrorAction SilentlyContinue) {
 
 Write-Log 'Installing application artifacts ...'
 Copy-Item -Path $BackendJar -Destination (Join-Path $AppDir 'app.jar') -Force
-$frontendTarget = Join-Path $AppDir 'frontend'
-if (Test-Path $frontendTarget) { Remove-Item -Recurse -Force $frontendTarget }
-Copy-Item -Path $FrontendDir -Destination $frontendTarget -Recurse -Force
+if (Test-Path $UiDir) { Remove-Item -Recurse -Force $UiDir }
+Copy-Item -Path $FrontendDir -Destination $UiDir -Recurse -Force
+
+# One-time migration: earlier installs put the assets in <AppDir>\frontend,
+# where nothing served them.
+$legacyFrontend = Join-Path $AppDir 'frontend'
+if (Test-Path $legacyFrontend) {
+    Write-Log "Removing the obsolete UI directory at $legacyFrontend (now served from $UiDir)"
+    Remove-Item -Recurse -Force $legacyFrontend
+}
 
 # Record the installed version for parity with Linux (/opt/moddex/VERSION) so
 # operators can verify an upgrade (Get-Content "$env:ProgramFiles\Moddex\VERSION").
@@ -275,6 +286,7 @@ $substitutions = [ordered]@{
     '@@DATA_DIR@@'       = $DataDir
     '@@CONFIG_DIR@@'     = $ConfigDir
     '@@LOG_DIR@@'        = $LogDir
+    '@@UI_DIR@@'         = $UiDir
     '@@MODE@@'           = $cfg.Mode
     '@@SERVER_ADDRESS@@' = $cfg.Address
     '@@SERVER_PORT@@'    = [string]$cfg.Port

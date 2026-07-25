@@ -62,6 +62,37 @@ else { Bad "service not running: $(if ($svc) { $svc.Status } else { 'absent' })"
 
 # Protected endpoint must reject anonymous access.
 $anon = Get-Status '/api/v1/instance'
+# Web UI delivery (Moddex#59). The backend serves the built UI on this same
+# port. Without these checks an installation can pass every API assertion here
+# and still have no usable browser interface - which is exactly how the defect
+# went unnoticed on Linux.
+$uiCode = Get-Status '/'
+if ($uiCode -eq 200) {
+    Ok "web UI served at / (200)"
+    try {
+        $uiBody = (Invoke-WebRequest -Uri "$BaseUrl/" -UseBasicParsing -TimeoutSec 5).Content
+        if ($uiBody -match '<app-root') { Ok 'app shell present in the served document' }
+        else { Bad 'document at / does not contain the Angular app shell' }
+    } catch {
+        Bad "could not read the document at /: $($_.Exception.Message)"
+    }
+} elseif ($uiCode -eq 404) {
+    Bad 'no web UI at / (404) - the bundle installed no frontend, or MODDEX_UI_DIR is wrong'
+} else {
+    Bad "unexpected response for / ($uiCode)"
+}
+
+# A client-side route must deliver the same shell: without the SPA fallback a
+# bookmark or refresh on /login 404s even though the app itself works.
+$loginCode = Get-Status '/login'
+if ($loginCode -eq 200) { Ok 'client-side route /login falls back to the app shell (200)' }
+else { Bad "client-side route /login not served ($loginCode)" }
+
+# The inverse rule: a missing asset must not be answered with the shell.
+$missingCode = Get-Status '/this-asset-does-not-exist.js'
+if ($missingCode -eq 404) { Ok 'missing asset returns 404 (no SPA fallback for assets)' }
+else { Bad "missing asset returned $missingCode instead of 404 - SPA fallback is too greedy" }
+
 if ($anon -eq 401 -or $anon -eq 403) { Ok "auth enforced (/instance -> $anon without a token)" }
 elseif ($anon -eq 200) { Bad '/instance served WITHOUT a token (200) - auth not enforced' }
 else { Info "unexpected anonymous status for /instance: $anon (continuing)" }
