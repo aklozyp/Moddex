@@ -128,11 +128,14 @@ jobs:
       # PowerShell defect does not need a Windows runner to surface.
       - name: Run pipeline
         shell: bash
+        # Invoked through `bash` rather than repaired with chmod first: a
+        # `chmod +x` here would fix a lost executable bit before the lint stage
+        # checks script modes, keeping CI green while a fresh checkout could not
+        # run the documented `scripts/ci/pipeline.sh` command at all.
+        #
         # No --allow-missing-tools: in CI an absent linter must fail the run
         # rather than silently reduce coverage.
-        run: |
-          chmod +x Moddex-build/scripts/ci/pipeline.sh
-          Moddex-build/scripts/ci/pipeline.sh
+        run: bash Moddex-build/scripts/ci/pipeline.sh
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
