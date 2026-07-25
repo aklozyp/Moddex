@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-read -p "Are you sure you want to uninstall? [y/N] " a
+read -r -p "Are you sure you want to uninstall? [y/N] " a
 [[ "${a,,}" == "y" ]] || exit 0
 sudo systemctl disable --now moddex-backend || true
 sudo rm -f /etc/systemd/system/moddex-backend.service

@@ -11,6 +11,69 @@ Linux bundle:
 
 Two GitHub Actions workflows cover build validation and releases.
 
+## Branch model
+
+All three repositories use the same two long-lived branches:
+
+| Branch | Role |
+|--------|------|
+| `develop` | Integration branch. Every ticket branch merges here. |
+| `main` | Stable release line. Only updated when a release is cut. |
+
+Work happens on per-ticket branches (`ai/<repo>/issue-<n>`) that target
+`develop`. The app repos previously used a third branch, `tests`, as their
+integration branch while `develop` sat unused and months out of date — which
+made "check out `develop`" the wrong instruction and cost a full working session
+before the divergence was noticed. `develop` has since been fast-forwarded onto
+that history in both app repos, and `tests` is retained only for genuinely
+experimental work that is not ready for integration.
+
+## The pipeline script
+
+Build, test and verification logic lives in
+[`scripts/ci/pipeline.sh`](../scripts/ci/pipeline.sh), not in workflow YAML. The
+workflows provide a checkout and a toolchain and then call it. The point is that
+a green local run and a green CI run mean the same thing, and a CI failure can
+be reproduced on a workstation without pushing a commit:
+
+```bash
+scripts/ci/pipeline.sh                    # everything
+scripts/ci/pipeline.sh backend frontend   # selected stages
+scripts/ci/pipeline.sh --list             # available stages
+```
+
+| Stage | What it does |
+|-------|--------------|
+| `tools` | Verifies the toolchain the selected stages need. |
+| `lint` | `shellcheck` plus `bash -n` over the shell scripts, PSScriptAnalyzer over the PowerShell scripts, and a check that every script kept its executable bit. |
+| `backend` | Backend unit tests (always `clean`) and the production JAR. |
+| `frontend` | `npm ci`, headless unit tests, production build. |
+| `bundle` | Assembles the installable bundle, reusing the artefacts the previous stages already built. |
+| `verify` | Checks the assembled artefact: structure, file modes, no stray sources, checksum. |
+
+### Missing tools fail the run
+
+A stage whose tool is absent fails rather than being skipped, because a skipped
+check that reports success is indistinguishable from a passing one.
+`--allow-missing-tools` downgrades that to a warning for workstation use; **CI
+never passes it**.
+
+On a Debian/Ubuntu workstation:
+
+```bash
+sudo apt-get install -y shellcheck chromium
+```
+
+PowerShell is only needed for the Windows-installer analysis and is available as
+a [self-contained tarball](https://github.com/PowerShell/PowerShell/releases).
+
+### Why `clean` is not optional
+
+The backend stage always runs `mvnw clean test`. Without it, Maven leaves
+compiled test classes in `target/` and surefire runs classes whose sources are no
+longer in the tree — which produces failures for tests that do not exist and,
+worse, green runs for tests that were deleted.
+
 ## Required secret: `MODDEX_CHECKOUT_TOKEN`
 
 Both workflows check out all three repositories into the sibling layout that
@@ -31,15 +94,14 @@ permission error.
 
 ## `ci.yml` — build validation
 
-Triggers: push and pull requests to `develop`, `tests`, `main`, plus manual
-dispatch.
+Triggers: push and pull requests to `develop` and `main`, plus manual dispatch.
 
 ### Cross-repo refs
 
 The backend/frontend checkouts are resolved per branch
 ([#53](https://github.com/aklozyp/Moddex/issues/53)): builds validating `main`
 of this repo check out `main` of the app repos (reproducible release-line
-builds); every other branch tracks the app repos' integration branch `tests`.
+builds); every other branch tracks the app repos' integration branch `develop`.
 Manual dispatch accepts explicit `backend_ref`/`frontend_ref` overrides. The
 resolved refs and their commit SHAs are recorded in the job summary of every
 run.
@@ -49,14 +111,12 @@ The app repos additionally run their own slim test workflows on every push/PR
 theme-contrast audit and AOT production build), so changes there are validated
 without waiting for this repo's bundle build.
 
-For every change it runs, across a runner matrix:
+The job itself is thin: check out the three repos, install the toolchain, run
+`scripts/ci/pipeline.sh`, upload the artefact. Everything the pipeline does is
+described under [The pipeline script](#the-pipeline-script) above and is
+reproducible locally.
 
-- backend tests (`mvnw -Pci test`),
-- frontend tests (`ChromeHeadless`, `--watch=false`),
-- the full bundle assembly (`build-bundle.sh`), which also runs the production
-  backend package and frontend build.
-
-The job **fails on any backend or frontend build/test error**. The assembled
+The job **fails on any lint, build, test or verification error**. The assembled
 bundle and its SHA256 checksum are uploaded as a versioned workflow artifact
 (`moddex-bundle-<os>`, label `ci-<run>-<os>`), retained for 14 days.
 
