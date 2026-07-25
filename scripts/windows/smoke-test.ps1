@@ -31,14 +31,25 @@ function Ok([string]$m)   { Write-Host "[ OK ] $m" -ForegroundColor Green }
 function Bad([string]$m)  { Write-Host "[FAIL] $m" -ForegroundColor Red; $script:failures++ }
 function Info([string]$m) { Write-Host "[ -- ] $m" }
 
+# Returns the HTTP status code, or 0 when there was no response at all.
+#
+# The two PowerShell editions raise different exceptions for an error status:
+# Windows PowerShell 5.1 throws System.Net.WebException, PowerShell 7 throws
+# Microsoft.PowerShell.Commands.HttpResponseException. Catching only the former
+# made every 4xx look like "no response" under PowerShell 7 — so a backend
+# correctly answering 404 for a missing asset failed the check. Both carry the
+# response on .Exception.Response, so one handler covers both editions.
 function Get-Status([string]$Path) {
     try {
         $r = Invoke-WebRequest -Uri "$BaseUrl$Path" -Method GET -UseBasicParsing -TimeoutSec 5
         return [int]$r.StatusCode
-    } catch [System.Net.WebException] {
-        if ($_.Exception.Response) { return [int]$_.Exception.Response.StatusCode }
+    } catch {
+        $response = $_.Exception.PSObject.Properties['Response']
+        if ($response -and $response.Value) {
+            return [int]$response.Value.StatusCode
+        }
         return 0
-    } catch { return 0 }
+    }
 }
 
 Info "Installing Moddex (local mode, port $Port) ..."
