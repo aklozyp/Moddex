@@ -31,5 +31,17 @@
             IndentationSize = 4
             Kind            = 'space'
         }
+
+        # The Windows scripts declare `#Requires -Version 5.1`, but the pipeline
+        # parses them with PowerShell 7 on Linux. PowerShell 7 accepts syntax
+        # that 5.1 rejects outright - null-coalescing, ternaries, chained
+        # pipelines - so a parse check alone would happily pass a script that
+        # cannot run on the oldest runtime the project promises to support.
+        # Checking both target versions closes that gap without needing a
+        # Windows runner.
+        PSUseCompatibleSyntax = @{
+            Enable         = $true
+            TargetVersions = @('5.1', '7.0')
+        }
     }
 }
