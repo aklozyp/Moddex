@@ -463,6 +463,17 @@ stage_bundle() {
 # installed "successfully", and scripts that lost their executable bit only
 # surfaced on the operator's machine.
 # -----------------------------------------------------------------------------
+# Checks run as functions taking real arguments rather than as interpolated
+# `bash -c` strings: a path or version label containing a quote would otherwise
+# produce malformed shell and fail a perfectly good bundle.
+no_typescript_sources() {
+  ! find "$1" -name '*.ts' -not -name '*.d.ts' -print -quit | grep -q .
+}
+
+checksum_verifies() {
+  ( cd "$1" && sha256sum -c "$2" )
+}
+
 stage_verify() {
   stage_banner "verify"
   local rc=0
@@ -496,14 +507,13 @@ stage_verify() {
 
   # --- The frontend must be a built artefact, not a source tree ---
   check "no node_modules in the bundle" test ! -d "${BUNDLE_DIR}/frontend/node_modules"
-  check "no TypeScript sources in the bundle" bash -c \
-    "! find '${BUNDLE_DIR}/frontend' -name '*.ts' -not -name '*.d.ts' | grep -q ."
+  check "no TypeScript sources in the bundle" no_typescript_sources "${BUNDLE_DIR}/frontend"
 
   # --- Archive + checksum ---
   local archive="${BUILD_DIR}/moddex-${VERSION}-linux-amd64.tar.gz"
   check "archive produced" test -f "$archive"
   if [[ -f "${archive}.sha256" ]]; then
-    check "checksum verifies" bash -c "cd '${BUILD_DIR}' && sha256sum -c '$(basename "${archive}.sha256")'"
+    check "checksum verifies" checksum_verifies "${BUILD_DIR}" "$(basename "${archive}.sha256")"
   else
     printf '  %sFAIL%s checksum file present\n' "$C_RED" "$C_RESET"
     rc=1
