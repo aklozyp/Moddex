@@ -215,6 +215,19 @@ if (-not $FrontendDir) { $FrontendDir = Join-Path $BundleRoot 'frontend' }
 if (-not (Test-Path $BackendJar))  { Die "Backend JAR not found: $BackendJar" }
 if (-not (Test-Path $FrontendDir)) { Die "Frontend assets not found: $FrontendDir" }
 
+# Checked here, before anything is stopped or deleted. The backend serves
+# index.html straight out of MODDEX_UI_DIR, so a directory without one at its
+# root is unusable - and validating it later would mean tearing down a working
+# installation first and then reporting success over the wreckage. Matches the
+# Linux installer's check (Moddex#59/#61).
+if (-not (Test-Path (Join-Path $FrontendDir 'index.html'))) {
+    Die @"
+Frontend directory has no index.html at its root: $FrontendDir
+This is not a built Angular app. Point -FrontendDir at the browser output
+(the directory containing index.html), not at the dist\ root.
+"@
+}
+
 $cfg = Resolve-Config -RequestedMode $Mode -RequestedPort $Port `
     -ModeWasGiven $ModeExplicit -PortWasGiven $PortExplicit
 Write-Log "Mode=$($cfg.Mode) Address=$($cfg.Address) Port=$($cfg.Port)"
