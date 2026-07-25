@@ -462,7 +462,14 @@ stage_bundle() {
     log "Assembling bundle (version ${VERSION}, building from source)"
   fi
 
-  VERSION="${VERSION}" "$builder" "${args[@]+"${args[@]}"}" || { record bundle failed; return 1; }
+  # The builder resolves the checkouts itself when it has to build from source,
+  # so the pipeline's --repo-root/--backend-dir/--frontend-dir overrides have to
+  # reach it. Without this it would silently fall back to the repos next to the
+  # packaging checkout and build something other than what was asked for.
+  VERSION="${VERSION}" \
+  MODDEX_BACKEND_DIR="${BACKEND_DIR}" \
+  MODDEX_FRONTEND_DIR="${FRONTEND_DIR}" \
+    "$builder" "${args[@]+"${args[@]}"}" || { record bundle failed; return 1; }
 
   record bundle ok
   return 0
