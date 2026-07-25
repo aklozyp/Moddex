@@ -78,7 +78,32 @@ try {
 } finally { Pop-Location }
 $frontendDist = Join-Path $FrontendDir 'dist'
 if (-not (Test-Path $frontendDist)) { Die "Frontend dist directory not found at $frontendDist" }
-Copy-Item -Path (Join-Path $frontendDist '*') -Destination (Join-Path $BundleDir 'frontend') -Recurse -Force
+
+# Angular's application builder emits to dist\<project>\browser by default, and
+# the project name is not something the packaging repo should hardcode. Copying
+# dist\* wholesale nests the app two levels too deep, and the backend - which
+# expects index.html directly under MODDEX_UI_DIR - then serves nothing
+# (the Windows counterpart of Moddex#61). Resolve the browser output from the
+# artefact that defines it: the shallowest directory containing index.html.
+$browserDir = Get-ChildItem -Path $frontendDist -Filter 'index.html' -File -Recurse |
+    Where-Object { $_.FullName -notmatch '[\\/](node_modules|server)[\\/]' } |
+    Sort-Object { $_.FullName.Split([IO.Path]::DirectorySeparatorChar).Count } |
+    Select-Object -First 1 -ExpandProperty DirectoryName
+
+if (-not $browserDir) {
+    Die "No index.html found under $frontendDist. The frontend build produced no browser output."
+}
+Write-Log "Frontend browser output: $browserDir"
+
+$frontendTarget = Join-Path $BundleDir 'frontend'
+New-Item -ItemType Directory -Force -Path $frontendTarget | Out-Null
+Copy-Item -Path (Join-Path $browserDir '*') -Destination $frontendTarget -Recurse -Force
+
+# The installer keys off exactly this path. Shipping a bundle without it means
+# installing a product with no user interface, so fail here rather than there.
+if (-not (Test-Path (Join-Path $frontendTarget 'index.html'))) {
+    Die 'Bundle assembly failed: frontend\index.html is missing from the bundle.'
+}
 
 # --- installer resources -----------------------------------------------------
 Write-Log 'Copying Windows installer resources'
