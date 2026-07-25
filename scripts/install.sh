@@ -38,6 +38,7 @@ MIN_JAVA_VERSION=17
 MODE="${MODE:-${MODDEX_MODE:-}}"
 BACKEND_JAR="${BACKEND_JAR:-${MODDEX_BACKEND_JAR:-}}"
 FRONTEND_DIR="${FRONTEND_DIR:-${MODDEX_FRONTEND_DIR:-}}"
+WITHOUT_FRONTEND=0
 
 # Track whether mode/port were given explicitly (env var or CLI flag) vs left at
 # their default. On a re-install we only rewrite an existing moddex.env when the
@@ -62,6 +63,9 @@ Options:
   --mode MODE           Deployment mode: local, lan, public
   --backend-jar PATH    Path to the backend JAR to install
   --frontend-dir PATH   Path to the directory with built frontend assets
+                        (the one containing index.html)
+  --without-frontend    Install the backend only, without a web UI. Without this
+                        flag a bundle that carries no usable UI is rejected.
   --port NUMBER         TCP port to expose the backend on (default: 8080)
   -h, --help            Show this help and exit
 
@@ -79,6 +83,7 @@ while [[ $# -gt 0 ]]; do
     --mode) [[ $# -ge 2 ]] || die "Missing value for --mode"; MODE="$2"; MODE_EXPLICIT=1; shift 2 ;;
     --backend-jar) [[ $# -ge 2 ]] || die "Missing value for --backend-jar"; BACKEND_JAR="$2"; shift 2 ;;
     --frontend-dir) [[ $# -ge 2 ]] || die "Missing value for --frontend-dir"; FRONTEND_DIR="$2"; shift 2 ;;
+    --without-frontend) WITHOUT_FRONTEND=1; shift ;;
     --port) [[ $# -ge 2 ]] || die "Missing value for --port"; SERVER_PORT="$2"; PORT_EXPLICIT=1; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "Unknown argument: $1" ;;
@@ -167,17 +172,37 @@ if [[ -z "$BACKEND_JAR" ]]; then
   BACKEND_JAR="$DEFAULT_JAR"
 fi
 
-if [[ -z "$FRONTEND_DIR" ]]; then
+# A bundle without a usable frontend installs a product with no user interface.
+# That used to pass silently: the default path was probed, found wanting, and
+# the deployment step was skipped with an informational line the operator was
+# unlikely to read (Moddex#61). A missing UI is now fatal unless the operator
+# explicitly asks for a backend-only install.
+# --without-frontend is an explicit operator decision and outranks everything
+# else, including a perfectly good UI sitting in the bundle. Checking it only
+# after auto-detection would silently deploy the UI the operator just declined.
+if [[ "$WITHOUT_FRONTEND" -eq 1 ]]; then
+  [[ -z "$FRONTEND_DIR" ]] || die "--without-frontend and --frontend-dir are mutually exclusive."
+  log "Installing without a web UI (--without-frontend)"
+elif [[ -z "$FRONTEND_DIR" ]]; then
   DEFAULT_FRONTEND="$PROJECT_ROOT/frontend"
-  if [[ -d "$DEFAULT_FRONTEND" && -f "$DEFAULT_FRONTEND/index.html" ]]; then
+  if [[ -f "$DEFAULT_FRONTEND/index.html" ]]; then
     FRONTEND_DIR="$DEFAULT_FRONTEND"
+  elif [[ -d "$DEFAULT_FRONTEND" ]]; then
+    die "No index.html in $DEFAULT_FRONTEND. The bundle carries no usable web UI.
+Rebuild it with scripts/build-bundle.sh, pass --frontend-dir PATH, or install
+without a UI using --without-frontend."
   else
-    FRONTEND_DIR=""
+    die "No frontend assets found at $DEFAULT_FRONTEND.
+Pass --frontend-dir PATH, or install without a UI using --without-frontend."
   fi
 fi
 
 if [[ -n "$FRONTEND_DIR" ]]; then
-  [[ -d "$FRONTEND_DIR" && -f "$FRONTEND_DIR/index.html" ]] || die "Frontend directory invalid. Use --frontend-dir."
+  [[ -d "$FRONTEND_DIR" ]] || die "Frontend directory does not exist: $FRONTEND_DIR"
+  [[ -f "$FRONTEND_DIR/index.html" ]] || \
+    die "Frontend directory has no index.html: $FRONTEND_DIR
+This is not a built Angular app. Point --frontend-dir at the browser output
+(the directory containing index.html), not at the dist/ root."
 fi
 
 need_cmd install
@@ -248,8 +273,12 @@ log "Installed version: $VERSION_STRING"
 if [[ -n "$FRONTEND_DIR" ]]; then
   log "Deploying frontend assets from $FRONTEND_DIR"
   rsync -a --delete --chown=moddex:moddex "$FRONTEND_DIR/" "$DATA_DIR/ui/"
-else
-  log "Skipping frontend asset deployment (no build directory provided)"
+elif [[ -n "$(ls -A "$DATA_DIR/ui" 2>/dev/null)" ]]; then
+  # A backend-only re-install over an existing installation must not leave the
+  # previous UI in place: anything still serving that directory would hand out
+  # an old frontend against a newer backend.
+  log "Removing the previously installed web UI from $DATA_DIR/ui (--without-frontend)"
+  find "$DATA_DIR/ui" -mindepth 1 -delete
 fi
 
 case "$MODE" in

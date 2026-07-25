@@ -149,6 +149,12 @@ The installer accepts optional arguments and environment variables if you need t
 - `--mode local|lan|public` - Deployment mode (default: `local`).
 - `--backend-jar <path>` - Custom backend JAR (default: `../backend/Moddex-Backend.jar`).
 - `--frontend-dir <path>` - Custom frontend build directory (default: `../frontend`).
+  Point this at the directory that *contains* `index.html`, not at Angular's
+  `dist/` root.
+- `--without-frontend` - Install the backend only, without a web UI. Without
+  this flag, a bundle that carries no usable UI is rejected instead of being
+  installed silently. On an existing installation this also removes the
+  previously installed UI, so nothing keeps serving a stale frontend.
 - `--port <number>` - Override the backend listen port (default: `8080`).
 
 ## Uninstall
