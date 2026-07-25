@@ -43,6 +43,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# Which parameters the caller actually supplied, captured HERE and nowhere else.
+# Inside a function $PSBoundParameters describes that function's own parameters,
+# so a function asking `$PSBoundParameters.ContainsKey('Mode')` always got $false
+# and an explicit -Mode/-Port was silently discarded (#57). Explicitness is a
+# property of the script invocation; it is determined once, at script scope, and
+# passed down.
+$ModeExplicit = $PSBoundParameters.ContainsKey('Mode')
+$PortExplicit = $PSBoundParameters.ContainsKey('Port')
+
 # --- constants ---------------------------------------------------------------
 $ServiceId   = 'moddex-backend'
 $AppDir      = Join-Path $env:ProgramFiles 'Moddex'
@@ -96,15 +105,23 @@ function Resolve-JavaExe {
 }
 
 # --- WinSW acquisition -------------------------------------------------------
+# Takes the operator-supplied path as a parameter instead of reading it from the
+# enclosing scope. The scope-visibility shortcut is what made #57 possible; the
+# same pattern is not left in place here.
 function Resolve-WinSw {
-    $bundled = if ($WinSwPath) { $WinSwPath } else { Join-Path $PackagingWin 'WinSW.exe' }
+    param([string] $RequestedPath)
+
+    $bundled = if ($RequestedPath) { $RequestedPath } else { Join-Path $PackagingWin 'WinSW.exe' }
     if (Test-Path $bundled) {
         Write-Log "Using bundled WinSW: $bundled"
         return $bundled
     }
+    if ($RequestedPath) {
+        Die "WinSW not found at the path given via -WinSwPath: $RequestedPath"
+    }
     # Not bundled: download the pinned release and verify its hash.
     $tmp = Join-Path $env:TEMP "WinSW-$WinSwVersion.exe"
-    Write-Log "Downloading WinSW $WinSwVersion …"
+    Write-Log "Downloading WinSW $WinSwVersion ..."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     Invoke-WebRequest -Uri $WinSwUrl -OutFile $tmp -UseBasicParsing
     $actual = (Get-FileHash -Algorithm SHA256 -Path $tmp).Hash.ToLowerInvariant()
@@ -146,21 +163,35 @@ function Get-UnmanagedEnv {
     return $kept
 }
 
+# Resolves the effective mode/port. Explicitness is passed in rather than
+# inferred, because it cannot be observed from here (see the note at the top of
+# the script). An explicitly supplied value always wins over an inherited one;
+# only an omitted parameter falls back to the existing installation, and only
+# then to the default.
 function Resolve-Config {
-    $modeExplicit = $PSBoundParameters.ContainsKey('Mode')
-    $portExplicit = $PSBoundParameters.ContainsKey('Port')
+    param(
+        [string] $RequestedMode,
+        [int]    $RequestedPort,
+        [bool]   $ModeWasGiven,
+        [bool]   $PortWasGiven
+    )
 
-    $resolvedMode = $Mode
-    if (-not $modeExplicit) {
+    if ($ModeWasGiven) {
+        $resolvedMode = $RequestedMode
+    } else {
         $existingMode = Get-ExistingEnv 'MODDEX_MODE'
-        if ($existingMode) { $resolvedMode = $existingMode }
-        elseif (-not $resolvedMode) {
+        if ($existingMode) {
+            $resolvedMode = $existingMode
+        } elseif ($RequestedMode) {
+            $resolvedMode = $RequestedMode
+        } else {
             Die 'No -Mode given and no existing install to inherit from. Pass -Mode local|lan|public.'
         }
     }
 
-    $resolvedPort = $Port
-    if (-not $portExplicit) {
+    if ($PortWasGiven) {
+        $resolvedPort = $RequestedPort
+    } else {
         $existingPort = Get-ExistingEnv 'SERVER_PORT'
         if ($existingPort) { $resolvedPort = [int]$existingPort } else { $resolvedPort = 8080 }
     }
@@ -180,7 +211,8 @@ if (-not $FrontendDir) { $FrontendDir = Join-Path $BundleRoot 'frontend' }
 if (-not (Test-Path $BackendJar))  { Die "Backend JAR not found: $BackendJar" }
 if (-not (Test-Path $FrontendDir)) { Die "Frontend assets not found: $FrontendDir" }
 
-$cfg = Resolve-Config
+$cfg = Resolve-Config -RequestedMode $Mode -RequestedPort $Port `
+    -ModeWasGiven $ModeExplicit -PortWasGiven $PortExplicit
 Write-Log "Mode=$($cfg.Mode) Address=$($cfg.Address) Port=$($cfg.Port)"
 
 # Public mode serves plain HTTP unless the operator sets up TLS (reverse proxy
@@ -208,11 +240,11 @@ foreach ($dir in @($AppDir, $DataDir, $ConfigDir, $LogDir)) {
 
 # Stop the service before replacing the JAR so the file is not locked.
 if (Get-Service -Name $ServiceId -ErrorAction SilentlyContinue) {
-    Write-Log 'Stopping existing service for upgrade …'
+    Write-Log 'Stopping existing service for upgrade ...'
     & $ServiceExe stop  2>$null | Out-Null
 }
 
-Write-Log 'Installing application artifacts …'
+Write-Log 'Installing application artifacts ...'
 Copy-Item -Path $BackendJar -Destination (Join-Path $AppDir 'app.jar') -Force
 $frontendTarget = Join-Path $AppDir 'frontend'
 if (Test-Path $frontendTarget) { Remove-Item -Recurse -Force $frontendTarget }
@@ -234,14 +266,28 @@ if (Test-Path $bundleVersion) {
 $templatePath = Join-Path $PackagingWin 'moddex-backend.xml.template'
 if (-not (Test-Path $templatePath)) { Die "Service template not found: $templatePath" }
 $xml = Get-Content -Path $templatePath -Raw
-$xml = $xml.Replace('@@JAVA_EXE@@', $javaExe).
-            Replace('@@APP_DIR@@', $AppDir).
-            Replace('@@DATA_DIR@@', $DataDir).
-            Replace('@@CONFIG_DIR@@', $ConfigDir).
-            Replace('@@LOG_DIR@@', $LogDir).
-            Replace('@@MODE@@', $cfg.Mode).
-            Replace('@@SERVER_ADDRESS@@', $cfg.Address).
-            Replace('@@SERVER_PORT@@', [string]$cfg.Port)
+
+# Placeholder table rather than a chained .Replace(): adding a placeholder is one
+# line, and the substitutions are visible as data instead of buried in a chain.
+$substitutions = [ordered]@{
+    '@@JAVA_EXE@@'       = $javaExe
+    '@@APP_DIR@@'        = $AppDir
+    '@@DATA_DIR@@'       = $DataDir
+    '@@CONFIG_DIR@@'     = $ConfigDir
+    '@@LOG_DIR@@'        = $LogDir
+    '@@MODE@@'           = $cfg.Mode
+    '@@SERVER_ADDRESS@@' = $cfg.Address
+    '@@SERVER_PORT@@'    = [string]$cfg.Port
+}
+foreach ($placeholder in $substitutions.Keys) {
+    $xml = $xml.Replace($placeholder, $substitutions[$placeholder])
+}
+
+# An unresolved placeholder would be written into the service definition and only
+# fail when the service refuses to start, so catch it here.
+if ($xml -match '@@[A-Z_]+@@') {
+    Die "Service template still contains an unresolved placeholder: $($Matches[0])"
+}
 
 # Re-render replaces the whole file, so carry over any operator-added <env>
 # entries from the previous definition before writing (read while the old XML is
@@ -263,15 +309,15 @@ if ($preservedEnv.Count -gt 0) {
 
 # Place the WinSW executable next to its XML (WinSW derives the config from its
 # own file name: moddex-backend.exe -> moddex-backend.xml).
-Copy-Item -Path (Resolve-WinSw) -Destination $ServiceExe -Force
+Copy-Item -Path (Resolve-WinSw -RequestedPath $WinSwPath) -Destination $ServiceExe -Force
 
 # (Re)install and start the service.
 if (Get-Service -Name $ServiceId -ErrorAction SilentlyContinue) {
-    Write-Log 'Updating service registration …'
+    Write-Log 'Updating service registration ...'
     & $ServiceExe uninstall | Out-Null
     Start-Sleep -Seconds 1
 }
-Write-Log 'Registering Windows service …'
+Write-Log 'Registering Windows service ...'
 & $ServiceExe install | Out-Null
 & $ServiceExe start   | Out-Null
 

@@ -36,7 +36,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 }
 
 if (Get-Service -Name $ServiceId -ErrorAction SilentlyContinue) {
-    Write-Log 'Stopping and removing the service …'
+    Write-Log 'Stopping and removing the service ...'
     if (Test-Path $ServiceExe) {
         & $ServiceExe stop      2>$null | Out-Null
         & $ServiceExe uninstall 2>$null | Out-Null
