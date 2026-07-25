@@ -177,12 +177,16 @@ fi
 # the deployment step was skipped with an informational line the operator was
 # unlikely to read (Moddex#61). A missing UI is now fatal unless the operator
 # explicitly asks for a backend-only install.
-if [[ -z "$FRONTEND_DIR" ]]; then
+# --without-frontend is an explicit operator decision and outranks everything
+# else, including a perfectly good UI sitting in the bundle. Checking it only
+# after auto-detection would silently deploy the UI the operator just declined.
+if [[ "$WITHOUT_FRONTEND" -eq 1 ]]; then
+  [[ -z "$FRONTEND_DIR" ]] || die "--without-frontend and --frontend-dir are mutually exclusive."
+  log "Installing without a web UI (--without-frontend)"
+elif [[ -z "$FRONTEND_DIR" ]]; then
   DEFAULT_FRONTEND="$PROJECT_ROOT/frontend"
   if [[ -f "$DEFAULT_FRONTEND/index.html" ]]; then
     FRONTEND_DIR="$DEFAULT_FRONTEND"
-  elif [[ "$WITHOUT_FRONTEND" -eq 1 ]]; then
-    FRONTEND_DIR=""
   elif [[ -d "$DEFAULT_FRONTEND" ]]; then
     die "No index.html in $DEFAULT_FRONTEND. The bundle carries no usable web UI.
 Rebuild it with scripts/build-bundle.sh, pass --frontend-dir PATH, or install
@@ -269,8 +273,12 @@ log "Installed version: $VERSION_STRING"
 if [[ -n "$FRONTEND_DIR" ]]; then
   log "Deploying frontend assets from $FRONTEND_DIR"
   rsync -a --delete --chown=moddex:moddex "$FRONTEND_DIR/" "$DATA_DIR/ui/"
-else
-  log "Skipping frontend asset deployment (no build directory provided)"
+elif [[ -n "$(ls -A "$DATA_DIR/ui" 2>/dev/null)" ]]; then
+  # A backend-only re-install over an existing installation must not leave the
+  # previous UI in place: anything still serving that directory would hand out
+  # an old frontend against a newer backend.
+  log "Removing the previously installed web UI from $DATA_DIR/ui (--without-frontend)"
+  find "$DATA_DIR/ui" -mindepth 1 -delete
 fi
 
 case "$MODE" in

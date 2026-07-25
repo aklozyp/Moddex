@@ -79,6 +79,49 @@ copy_dir() {
   fi
 }
 
+# Validate and stage prebuilt inputs BEFORE the build directory is wiped. A
+# caller may legitimately point at artefacts that live inside build/ — the
+# output of a previous run, for instance — and clearing the directory first
+# would delete the very inputs this run was asked to package.
+STAGING_DIR=""
+cleanup_staging() { [[ -n "${STAGING_DIR}" && -d "${STAGING_DIR}" ]] && rm -rf "${STAGING_DIR}"; }
+trap cleanup_staging EXIT
+
+abs_path() { (cd "$(dirname "$1")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$1")"); }
+
+is_inside_build_dir() {
+  local resolved build_resolved
+  resolved="$1"
+  build_resolved="$(cd "$(dirname "${BUILD_DIR}")" && printf '%s/%s' "$(pwd -P)" "$(basename "${BUILD_DIR}")")"
+  [[ "$resolved" == "$build_resolved" || "$resolved" == "$build_resolved"/* ]]
+}
+
+if [[ -n "${PREBUILT_JAR}" ]]; then
+  [[ -f "${PREBUILT_JAR}" ]] || die "Prebuilt backend JAR not found: ${PREBUILT_JAR}"
+  PREBUILT_JAR="$(abs_path "${PREBUILT_JAR}")"
+fi
+if [[ -n "${PREBUILT_DIST}" ]]; then
+  [[ -d "${PREBUILT_DIST}" ]] || die "Prebuilt frontend directory not found: ${PREBUILT_DIST}"
+  [[ -f "${PREBUILT_DIST}/index.html" ]] || \
+    die "Prebuilt frontend directory has no index.html: ${PREBUILT_DIST}"
+  PREBUILT_DIST="$(abs_path "${PREBUILT_DIST}")"
+fi
+
+# Move anything that would be destroyed out of harm's way first.
+if [[ -n "${PREBUILT_JAR}" ]] && is_inside_build_dir "${PREBUILT_JAR}"; then
+  STAGING_DIR="${STAGING_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/moddex-bundle.XXXXXX")}"
+  log "Staging prebuilt JAR out of the build directory"
+  cp "${PREBUILT_JAR}" "${STAGING_DIR}/Moddex-Backend.jar"
+  PREBUILT_JAR="${STAGING_DIR}/Moddex-Backend.jar"
+fi
+if [[ -n "${PREBUILT_DIST}" ]] && is_inside_build_dir "${PREBUILT_DIST}"; then
+  STAGING_DIR="${STAGING_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/moddex-bundle.XXXXXX")}"
+  log "Staging prebuilt frontend out of the build directory"
+  mkdir -p "${STAGING_DIR}/frontend"
+  cp -R "${PREBUILT_DIST}/." "${STAGING_DIR}/frontend/"
+  PREBUILT_DIST="${STAGING_DIR}/frontend"
+fi
+
 rm -rf "${BUILD_DIR}"
 mkdir -p "${BACKEND_BUILD_DIR}" "${FRONTEND_BUILD_DIR}"
 
@@ -86,7 +129,7 @@ mkdir -p "${BACKEND_BUILD_DIR}" "${FRONTEND_BUILD_DIR}"
 # Backend JAR
 # -----------------------------------------------------------------------------
 if [[ -n "${PREBUILT_JAR}" ]]; then
-  [[ -f "${PREBUILT_JAR}" ]] || die "Prebuilt backend JAR not found: ${PREBUILT_JAR}"
+  # Validated (and staged if needed) before the build directory was cleared.
   log "Using prebuilt backend JAR: ${PREBUILT_JAR}"
   BACKEND_JAR="${PREBUILT_JAR}"
 else
@@ -131,9 +174,8 @@ resolve_browser_dir() {
 }
 
 if [[ -n "${PREBUILT_DIST}" ]]; then
-  [[ -d "${PREBUILT_DIST}" ]] || die "Prebuilt frontend directory not found: ${PREBUILT_DIST}"
-  [[ -f "${PREBUILT_DIST}/index.html" ]] || \
-    die "Prebuilt frontend directory has no index.html: ${PREBUILT_DIST}"
+  # Existence and index.html were validated (and the directory staged if needed)
+  # before the build directory was cleared.
   log "Using prebuilt frontend assets: ${PREBUILT_DIST}"
   BROWSER_DIR="${PREBUILT_DIST}"
 else
