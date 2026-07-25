@@ -1,10 +1,13 @@
 name: ci
 
-# Build validation for the Moddex distribution. Runs the backend tests + package
-# and the frontend tests + production build across a Debian/Ubuntu-compatible
-# runner matrix, then assembles the deployment bundle so the whole release
-# pipeline is exercised on every change. The job fails on any backend or
-# frontend build/test error (acceptance criterion of #21).
+# Build validation for the Moddex distribution.
+#
+# This workflow provides a checkout and a toolchain, then hands over to
+# scripts/ci/pipeline.sh. Every build, test and verification step lives in that
+# script, so a green local run and a green CI run mean the same thing and a
+# broken pipeline can be reproduced on a workstation without pushing a commit:
+#
+#   scripts/ci/pipeline.sh
 #
 # Cross-repo checkout: Moddex-Backend and Moddex-Frontend are private, so set the
 # MODDEX_CHECKOUT_TOKEN secret to a token with read access to all three repos
@@ -12,24 +15,24 @@ name: ci
 #
 # Target matrix: ubuntu-22.04 and ubuntu-24.04 cover the glibc range of the
 # supported Debian/Ubuntu targets. Arch Linux has no GitHub-hosted runner and is
-# treated as experimental (documented in docs/ci.md). Windows packaging (v0.3,
-# epic #26) is assembled by the separate `build-windows` job below on a Windows
-# runner; it runs independently and does not gate the Linux build.
+# treated as experimental (documented in docs/ci.md). Windows packaging is
+# assembled by the separate `build-windows` job on a Windows runner; it runs
+# independently and does not gate the Linux build.
 
 on:
   push:
-    branches: [develop, tests, main]
+    branches: [develop, main]
   pull_request:
-    branches: [develop, tests, main]
+    branches: [develop, main]
   workflow_dispatch:
     inputs:
       backend_ref:
-        description: 'Moddex-Backend ref (branch, tag or SHA). Empty = branch default (main -> main, else tests).'
+        description: 'Moddex-Backend ref (branch, tag or SHA). Empty = branch default (main -> main, else develop).'
         required: false
         default: ''
         type: string
       frontend_ref:
-        description: 'Moddex-Frontend ref (branch, tag or SHA). Empty = branch default (main -> main, else tests).'
+        description: 'Moddex-Frontend ref (branch, tag or SHA). Empty = branch default (main -> main, else develop).'
         required: false
         default: ''
         type: string
@@ -38,13 +41,13 @@ concurrency:
   group: moddex-ci-${{ github.ref }}
   cancel-in-progress: true
 
-# Cross-repo refs (#53): builds validating `main` of this repo check out `main`
-# of the app repos (reproducible release-line builds); everything else tracks
-# the app repos' integration branch `tests`. workflow_dispatch can override
-# both. The resolved refs + SHAs are written to the job summary.
+# Cross-repo refs: builds validating `main` of this repo check out `main` of the
+# app repos (reproducible release-line builds); everything else tracks the app
+# repos' integration branch `develop`. workflow_dispatch can override both. The
+# resolved refs + SHAs are written to the job summary.
 env:
-  BACKEND_REF: ${{ inputs.backend_ref || ((github.base_ref || github.ref_name) == 'main' && 'main' || 'tests') }}
-  FRONTEND_REF: ${{ inputs.frontend_ref || ((github.base_ref || github.ref_name) == 'main' && 'main' || 'tests') }}
+  BACKEND_REF: ${{ inputs.backend_ref || ((github.base_ref || github.ref_name) == 'main' && 'main' || 'develop') }}
+  FRONTEND_REF: ${{ inputs.frontend_ref || ((github.base_ref || github.ref_name) == 'main' && 'main' || 'develop') }}
 
 # Least privilege: this workflow only checks out code and builds. It never writes
 # to the repo, so the default GITHUB_TOKEN is dropped to read-only. (The private
@@ -115,29 +118,21 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'Moddex-Frontend/package-lock.json'
 
-      - name: Backend tests
-        # Writable Moddex dirs: the context-load test boots the full app, whose
-        # JwtService persists its secret into the config dir (default
-        # /etc/moddex, not writable on hosted runners). Mirrors smoke.yml
-        # (Moddex-Backend#55).
-        env:
-          MODDEX_ROOT: ${{ runner.temp }}/moddex-data
-          MODDEX_CONFIG_DIR: ${{ runner.temp }}/moddex-cfg
-          MODDEX_LOG_DIR: ${{ runner.temp }}/moddex-log
+      - name: Install shellcheck
         run: |
-          chmod +x Moddex-Backend/mvnw
-          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pci test
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends shellcheck
 
-      - name: Frontend install
-        run: npm --prefix Moddex-Frontend ci
-
-      - name: Frontend tests (headless)
-        run: npm --prefix Moddex-Frontend run test -- --watch=false --browsers=ChromeHeadless
-
-      - name: Assemble deployment bundle
+      # PowerShell and Chrome are preinstalled on GitHub's Ubuntu runners. The
+      # pipeline analyses the Windows installer scripts on this Linux job, so a
+      # PowerShell defect does not need a Windows runner to surface.
+      - name: Run pipeline
+        shell: bash
+        # No --allow-missing-tools: in CI an absent linter must fail the run
+        # rather than silently reduce coverage.
         run: |
-          chmod +x Moddex-build/scripts/build-bundle.sh
-          Moddex-build/scripts/build-bundle.sh
+          chmod +x Moddex-build/scripts/ci/pipeline.sh
+          Moddex-build/scripts/ci/pipeline.sh
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -150,8 +145,9 @@ jobs:
           retention-days: 14
 
   # Windows packaging (v0.3 target, epic #26). Assembles the installable Windows
-  # artifact so the PowerShell installer/service path is exercised on every change.
-  # Runs independently on a Windows runner; it does not gate the Linux build.
+  # artifact so the PowerShell installer/service path is exercised on every
+  # change. Runs independently on a Windows runner; it does not gate the Linux
+  # build.
   build-windows:
     runs-on: windows-2022
     env:
