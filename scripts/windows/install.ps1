@@ -284,8 +284,12 @@ foreach ($placeholder in $substitutions.Keys) {
 }
 
 # An unresolved placeholder would be written into the service definition and only
-# fail when the service refuses to start, so catch it here.
-if ($xml -match '@@[A-Z_]+@@') {
+# fail when the service refuses to start, so catch it here. The check runs over
+# the XML with comments stripped: the template's own header comment describes the
+# mechanism using the literal "@@PLACEHOLDERS@@", which is documentation, not a
+# substitution site.
+$xmlWithoutComments = [regex]::Replace($xml, '(?s)<!--.*?-->', '')
+if ($xmlWithoutComments -match '@@[A-Z_]+@@') {
     Die "Service template still contains an unresolved placeholder: $($Matches[0])"
 }
 
