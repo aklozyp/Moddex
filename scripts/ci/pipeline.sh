@@ -169,16 +169,27 @@ require_tool() {
 
 # Angular's karma builder needs a Chrome binary. Resolve one so a workstation
 # does not have to export CHROME_BIN by hand.
+# A candidate counts only if it actually starts. A Chrome build whose shared
+# libraries are missing is present on PATH and executable, but every test run
+# against it dies with a linker error that looks nothing like a browser problem.
+chrome_runs() {
+  "$1" --version >/dev/null 2>&1
+}
+
 resolve_chrome() {
-  if [[ -n "${CHROME_BIN:-}" && -x "${CHROME_BIN}" ]]; then
+  if [[ -n "${CHROME_BIN:-}" && -x "${CHROME_BIN}" ]] && chrome_runs "${CHROME_BIN}"; then
     return 0
   fi
-  local candidate
+  local candidate resolved
   for candidate in chromium chromium-browser google-chrome google-chrome-stable; do
     if have "$candidate"; then
-      CHROME_BIN="$(command -v "$candidate")"
-      export CHROME_BIN
-      return 0
+      resolved="$(command -v "$candidate")"
+      if chrome_runs "$resolved"; then
+        CHROME_BIN="$resolved"
+        export CHROME_BIN
+        return 0
+      fi
+      warn "found $candidate at $resolved but it does not run (missing libraries?)"
     fi
   done
   return 1

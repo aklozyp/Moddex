@@ -56,7 +56,11 @@ load_env() {
     if [[ -r "$ENV_FILE" ]]; then
         local addr port
         # Read without polluting the current shell beyond what we extract.
+        # The env file is machine-local runtime configuration written by the
+        # installer; its contents cannot be known at lint time.
+        # shellcheck source=/dev/null
         addr="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_ADDRESS:-}")"
+        # shellcheck source=/dev/null
         port="$(. "$ENV_FILE" 2>/dev/null; printf '%s' "${SERVER_PORT:-}")"
         [[ -z "${SERVER_ADDRESS:-}" && -n "$addr" ]] && SERVER_ADDRESS="$addr"
         [[ -z "${SERVER_PORT:-}" && -n "$port" ]] && SERVER_PORT="$port"
