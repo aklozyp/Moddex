@@ -140,7 +140,7 @@ function Resolve-WinSw {
 # Env names the template renders from -Mode/-Port; everything else in an existing
 # service definition was added by the operator and must survive an upgrade.
 $ManagedEnv = @(
-    'MODDEX_ROOT', 'MODDEX_CONFIG_DIR', 'MODDEX_LOG_DIR',
+    'MODDEX_ROOT', 'MODDEX_CONFIG_DIR', 'MODDEX_LOG_DIR', 'MODDEX_UI_DIR',
     'MODDEX_MODE', 'MODDEX_SECURITY_MODE', 'SERVER_ADDRESS', 'SERVER_PORT'
 )
 
