@@ -36,7 +36,7 @@ function Info([string]$m) { Write-Host "[ -- ] $m" }
 # The two PowerShell editions raise different exceptions for an error status:
 # Windows PowerShell 5.1 throws System.Net.WebException, PowerShell 7 throws
 # Microsoft.PowerShell.Commands.HttpResponseException. Catching only the former
-# made every 4xx look like "no response" under PowerShell 7 — so a backend
+# made every 4xx look like "no response" under PowerShell 7 - so a backend
 # correctly answering 404 for a missing asset failed the check. Both carry the
 # response on .Exception.Response, so one handler covers both editions.
 function Get-Status([string]$Path) {
@@ -71,8 +71,6 @@ $svc = Get-Service -Name 'moddex-backend' -ErrorAction SilentlyContinue
 if ($svc -and $svc.Status -eq 'Running') { Ok "service status: $($svc.Status)" }
 else { Bad "service not running: $(if ($svc) { $svc.Status } else { 'absent' })" }
 
-# Protected endpoint must reject anonymous access.
-$anon = Get-Status '/api/v1/instance'
 # Web UI delivery (Moddex#59). The backend serves the built UI on this same
 # port. Without these checks an installation can pass every API assertion here
 # and still have no usable browser interface - which is exactly how the defect
@@ -104,6 +102,8 @@ $missingCode = Get-Status '/this-asset-does-not-exist.js'
 if ($missingCode -eq 404) { Ok 'missing asset returns 404 (no SPA fallback for assets)' }
 else { Bad "missing asset returned $missingCode instead of 404 - SPA fallback is too greedy" }
 
+# Protected endpoint must reject anonymous access.
+$anon = Get-Status '/api/v1/instance'
 if ($anon -eq 401 -or $anon -eq 403) { Ok "auth enforced (/instance -> $anon without a token)" }
 elseif ($anon -eq 200) { Bad '/instance served WITHOUT a token (200) - auth not enforced' }
 else { Info "unexpected anonymous status for /instance: $anon (continuing)" }
