@@ -28,6 +28,7 @@ SYSTEMD_DIR="$PROJECT_ROOT/packaging/systemd"
 # Filesystem layout (FHS-aligned). The backend reads these via MODDEX_* env vars
 # (see application.yml), so the installer, systemd unit and CLI all agree.
 APP_DIR=/opt/moddex
+UI_DIR=/opt/moddex/ui
 DATA_DIR=/var/lib/moddex
 CONFIG_DIR=/etc/moddex
 LOG_DIR=/var/log/moddex
@@ -243,8 +244,12 @@ fi
 
 install -d -m 0755 -o moddex -g moddex "$APP_DIR"
 install -d -m 0755 -o moddex -g moddex "$DATA_DIR"
-install -d -m 0755 -o moddex -g moddex "$DATA_DIR/ui"
 install -d -m 0755 -o moddex -g moddex "$LOG_DIR"
+# The web UI belongs to the application, not to the instance data: it is
+# replaced wholesale on every upgrade and the service must never be able to
+# rewrite what browsers are served. Hence root-owned under /opt and only
+# readable by the service (Moddex#59).
+install -d -m 0755 -o root -g root "$UI_DIR"
 # Config is root-owned but group-readable by the service so secrets in moddex.env
 # are not world-readable.
 install -d -m 0750 -o root -g moddex "$CONFIG_DIR"
@@ -271,14 +276,23 @@ chown moddex:moddex "$APP_DIR/VERSION"
 log "Installed version: $VERSION_STRING"
 
 if [[ -n "$FRONTEND_DIR" ]]; then
-  log "Deploying frontend assets from $FRONTEND_DIR"
-  rsync -a --delete --chown=moddex:moddex "$FRONTEND_DIR/" "$DATA_DIR/ui/"
-elif [[ -n "$(ls -A "$DATA_DIR/ui" 2>/dev/null)" ]]; then
+  log "Deploying frontend assets to $UI_DIR"
+  rsync -a --delete --chown=root:root "$FRONTEND_DIR/" "$UI_DIR/"
+  find "$UI_DIR" -type d -exec chmod 0755 {} +
+  find "$UI_DIR" -type f -exec chmod 0644 {} +
+elif [[ -n "$(ls -A "$UI_DIR" 2>/dev/null)" ]]; then
   # A backend-only re-install over an existing installation must not leave the
-  # previous UI in place: anything still serving that directory would hand out
-  # an old frontend against a newer backend.
-  log "Removing the previously installed web UI from $DATA_DIR/ui (--without-frontend)"
-  find "$DATA_DIR/ui" -mindepth 1 -delete
+  # previous UI in place: the backend would keep serving an old frontend against
+  # a newer API.
+  log "Removing the previously installed web UI from $UI_DIR (--without-frontend)"
+  find "$UI_DIR" -mindepth 1 -delete
+fi
+
+# One-time migration: earlier installs put the UI in the instance data
+# directory, where nothing served it and the service could write to it.
+if [[ -d "$DATA_DIR/ui" ]]; then
+  log "Removing the obsolete UI directory at $DATA_DIR/ui (now served from $UI_DIR)"
+  rm -rf "$DATA_DIR/ui"
 fi
 
 case "$MODE" in
@@ -303,6 +317,7 @@ MODDEX_SECURITY_MODE=$MODE
 MODDEX_ROOT=$DATA_DIR
 MODDEX_CONFIG_DIR=$CONFIG_DIR
 MODDEX_LOG_DIR=$LOG_DIR
+MODDEX_UI_DIR=$UI_DIR
 SERVER_ADDRESS=$SERVER_ADDRESS
 SERVER_PORT=$SERVER_PORT
 # Transport security (Moddex-Backend#50). Behind a TLS-terminating reverse
@@ -376,7 +391,15 @@ fi
 
 log "Reloading systemd and starting backend"
 systemctl daemon-reload
-systemctl enable --now moddex-backend.service
+systemctl enable moddex-backend.service
+# `enable --now` starts a stopped unit but does not restart a running one, so an
+# upgrade would leave the old JVM serving the old JAR and the old environment.
+# That is bad enough on its own; combined with the UI migration above it is
+# worse, because the previous UI directory is already gone while the running
+# process does not know about the new one. An explicit restart is the only thing
+# that makes an upgrade take effect. (Staging, readiness and rollback around
+# this are tracked in #62.)
+systemctl restart moddex-backend.service
 
 if [[ "$MODE" != "local" ]]; then
   if command -v ufw >/dev/null 2>&1; then
@@ -390,10 +413,12 @@ if [[ "$MODE" != "local" ]]; then
 fi
 
 log "Installation complete"
+# The backend serves the web UI on the same port as the API (Moddex#59), so
+# there is one address to hand the operator, not two.
 case "$MODE" in
-  local) printf 'Backend API reachable at: http://127.0.0.1:%s\n' "$SERVER_PORT" ;;
-  lan)   printf 'Backend API reachable at: http://<server-ip>:%s\n' "$SERVER_PORT" ;;
-  public) printf 'Backend API reachable at: http://<public-host>:%s (no TLS configured)\n' "$SERVER_PORT" ;;
+  local) printf 'Web UI and API: http://127.0.0.1:%s\n' "$SERVER_PORT" ;;
+  lan)   printf 'Web UI and API: http://<server-ip>:%s\n' "$SERVER_PORT" ;;
+  public) printf 'Web UI and API: http://<public-host>:%s (no TLS configured)\n' "$SERVER_PORT" ;;
 esac
 printf 'Systemd unit: moddex-backend.service\n'
 printf 'Configuration: %s\n' "$ENV_FILE"
@@ -402,7 +427,9 @@ if command -v moddex >/dev/null 2>&1 || [[ -x "$CLI_PATH" ]]; then
   printf 'CLI installed: run "moddex status" or "moddex help".\n'
 fi
 if [[ -n "$FRONTEND_DIR" ]]; then
-  printf 'Static frontend copied to %s/ui (serve separately).\n' "$DATA_DIR"
+  printf 'Web UI served from: %s (no separate web server needed)\n' "$UI_DIR"
+else
+  printf 'Installed without a web UI (--without-frontend); the API is available, the browser interface is not.\n'
 fi
 printf 'Complete the first-run setup in the web UI to set an admin password. Then verify a protected endpoint returns 401 without a token, e.g.:\n'
 printf '  curl -i http://127.0.0.1:%s/api/v1/instance\n' "$SERVER_PORT"

@@ -31,14 +31,25 @@ function Ok([string]$m)   { Write-Host "[ OK ] $m" -ForegroundColor Green }
 function Bad([string]$m)  { Write-Host "[FAIL] $m" -ForegroundColor Red; $script:failures++ }
 function Info([string]$m) { Write-Host "[ -- ] $m" }
 
+# Returns the HTTP status code, or 0 when there was no response at all.
+#
+# The two PowerShell editions raise different exceptions for an error status:
+# Windows PowerShell 5.1 throws System.Net.WebException, PowerShell 7 throws
+# Microsoft.PowerShell.Commands.HttpResponseException. Catching only the former
+# made every 4xx look like "no response" under PowerShell 7 - so a backend
+# correctly answering 404 for a missing asset failed the check. Both carry the
+# response on .Exception.Response, so one handler covers both editions.
 function Get-Status([string]$Path) {
     try {
         $r = Invoke-WebRequest -Uri "$BaseUrl$Path" -Method GET -UseBasicParsing -TimeoutSec 5
         return [int]$r.StatusCode
-    } catch [System.Net.WebException] {
-        if ($_.Exception.Response) { return [int]$_.Exception.Response.StatusCode }
+    } catch {
+        $response = $_.Exception.PSObject.Properties['Response']
+        if ($response -and $response.Value) {
+            return [int]$response.Value.StatusCode
+        }
         return 0
-    } catch { return 0 }
+    }
 }
 
 Info "Installing Moddex (local mode, port $Port) ..."
@@ -59,6 +70,37 @@ else { Bad 'backend not reachable after ~120s' }
 $svc = Get-Service -Name 'moddex-backend' -ErrorAction SilentlyContinue
 if ($svc -and $svc.Status -eq 'Running') { Ok "service status: $($svc.Status)" }
 else { Bad "service not running: $(if ($svc) { $svc.Status } else { 'absent' })" }
+
+# Web UI delivery (Moddex#59). The backend serves the built UI on this same
+# port. Without these checks an installation can pass every API assertion here
+# and still have no usable browser interface - which is exactly how the defect
+# went unnoticed on Linux.
+$uiCode = Get-Status '/'
+if ($uiCode -eq 200) {
+    Ok "web UI served at / (200)"
+    try {
+        $uiBody = (Invoke-WebRequest -Uri "$BaseUrl/" -UseBasicParsing -TimeoutSec 5).Content
+        if ($uiBody -match '<app-root') { Ok 'app shell present in the served document' }
+        else { Bad 'document at / does not contain the Angular app shell' }
+    } catch {
+        Bad "could not read the document at /: $($_.Exception.Message)"
+    }
+} elseif ($uiCode -eq 404) {
+    Bad 'no web UI at / (404) - the bundle installed no frontend, or MODDEX_UI_DIR is wrong'
+} else {
+    Bad "unexpected response for / ($uiCode)"
+}
+
+# A client-side route must deliver the same shell: without the SPA fallback a
+# bookmark or refresh on /login 404s even though the app itself works.
+$loginCode = Get-Status '/login'
+if ($loginCode -eq 200) { Ok 'client-side route /login falls back to the app shell (200)' }
+else { Bad "client-side route /login not served ($loginCode)" }
+
+# The inverse rule: a missing asset must not be answered with the shell.
+$missingCode = Get-Status '/this-asset-does-not-exist.js'
+if ($missingCode -eq 404) { Ok 'missing asset returns 404 (no SPA fallback for assets)' }
+else { Bad "missing asset returned $missingCode instead of 404 - SPA fallback is too greedy" }
 
 # Protected endpoint must reject anonymous access.
 $anon = Get-Status '/api/v1/instance'
