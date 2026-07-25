@@ -109,6 +109,15 @@ if [[ ${#REQUESTED_STAGES[@]} -eq 0 ]]; then
   REQUESTED_STAGES=("${ALL_STAGES[@]}")
 fi
 
+# The toolchain check is never optional. Naming stages explicitly
+# (`pipeline.sh lint`) must not be a way around the missing-tool policy —
+# otherwise a machine without shellcheck would run that command, skip the
+# linting, and exit 0.
+# shellcheck disable=SC2076
+if [[ " ${REQUESTED_STAGES[*]} " != *" tools "* ]]; then
+  REQUESTED_STAGES=(tools "${REQUESTED_STAGES[@]}")
+fi
+
 wants_stage() {
   # shellcheck disable=SC2076
   [[ " ${REQUESTED_STAGES[*]} " == *" $1 "* ]]
@@ -298,7 +307,11 @@ stage_lint() {
   local ps_dir="${PROJECT_ROOT}/scripts/windows"
   if [[ -d "$ps_dir" ]] && have pwsh; then
     log "Analysing PowerShell scripts in ${ps_dir#"${PROJECT_ROOT}/"}"
-    pwsh -NoProfile -NonInteractive -File "${SCRIPT_DIR}/lint-powershell.ps1" -Path "$ps_dir" || rc=1
+    # The analyzer module is fetched on demand. If that fails the helper exits
+    # non-zero unless reduced coverage was explicitly accepted here too.
+    local ps_args=(-Path "$ps_dir")
+    [[ "$ALLOW_MISSING_TOOLS" -eq 1 ]] && ps_args+=(-AllowMissingAnalyzer)
+    pwsh -NoProfile -NonInteractive -File "${SCRIPT_DIR}/lint-powershell.ps1" "${ps_args[@]}" || rc=1
   elif [[ -d "$ps_dir" ]]; then
     warn "pwsh unavailable — PowerShell analysis skipped"
   fi

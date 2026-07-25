@@ -21,6 +21,12 @@
 
 .PARAMETER Severity
     Lowest PSScriptAnalyzer severity treated as a failure. Default: Warning.
+
+.PARAMETER AllowMissingAnalyzer
+    Treat an unavailable PSScriptAnalyzer as reduced coverage instead of a
+    failure. Without it, an analyzer that cannot be installed fails the run:
+    reporting success for analysis that never happened is indistinguishable
+    from analysis that found nothing.
 #>
 [CmdletBinding()]
 param(
@@ -28,7 +34,9 @@ param(
     [string] $Path,
 
     [ValidateSet('Information', 'Warning', 'Error')]
-    [string] $Severity = 'Warning'
+    [string] $Severity = 'Warning',
+
+    [switch] $AllowMissingAnalyzer
 )
 
 $ErrorActionPreference = 'Stop'
@@ -107,9 +115,17 @@ if ($analyzer) {
             if ($isFailure) { $failed = $true }
         }
     }
-} else {
-    Write-Host "[ps-lint] Analysis skipped — parse check only (reduced coverage)" `
+} elseif ($AllowMissingAnalyzer) {
+    Write-Host "[ps-lint] Analysis skipped - parse check only (reduced coverage)" `
         -ForegroundColor Yellow
+} else {
+    Write-Host "[ps-lint] PSScriptAnalyzer is unavailable and could not be installed." `
+        -ForegroundColor Red
+    Write-Host "[ps-lint] Refusing to report success for analysis that did not run." `
+        -ForegroundColor Red
+    Write-Host "[ps-lint] Install it, or pass -AllowMissingAnalyzer to accept reduced coverage." `
+        -ForegroundColor Red
+    exit 1
 }
 
 if ($failed) {
