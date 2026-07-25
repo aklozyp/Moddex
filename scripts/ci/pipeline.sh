@@ -327,12 +327,22 @@ stage_backend() {
   stage_banner "backend"
   [[ -f "${BACKEND_DIR}/pom.xml" ]] || die "Backend project not found at ${BACKEND_DIR}"
 
-  chmod +x "${BACKEND_DIR}/mvnw"
+  # Every stage runs as the condition of an `if`, which disables errexit inside
+  # it, so setup that must succeed is checked explicitly. A silently failed
+  # scratch-directory reset would let the tests run against stale state and
+  # still report success.
+  chmod +x "${BACKEND_DIR}/mvnw" || {
+    record backend failed "mvnw not executable"; return 1
+  }
 
   # Point every writable path at a scratch directory. Without this the context
   # test writes to /etc/moddex and /var/log/moddex.
-  rm -rf "${TEST_STATE_DIR}"
-  mkdir -p "${TEST_STATE_DIR}"/{data,config,logs}
+  rm -rf "${TEST_STATE_DIR}" || {
+    record backend failed "could not clear ${TEST_STATE_DIR}"; return 1
+  }
+  mkdir -p "${TEST_STATE_DIR}"/{data,config,logs} || {
+    record backend failed "could not create ${TEST_STATE_DIR}"; return 1
+  }
 
   # `clean` is not optional. A previous build leaves compiled test classes in
   # target/, and surefire happily runs classes whose sources no longer exist —
@@ -443,7 +453,8 @@ stage_bundle() {
   local builder="${PROJECT_ROOT}/scripts/build-bundle.sh"
   [[ -f "$builder" ]] || die "Bundle builder not found at $builder"
 
-  chmod +x "$builder"
+  # Checked explicitly: errexit does not apply inside a stage (see stage_backend).
+  chmod +x "$builder" || { record bundle failed "builder not executable"; return 1; }
 
   # Reuse what the earlier stages produced. Packaging the exact artefacts that
   # were just tested is both faster and more honest than rebuilding them: a
