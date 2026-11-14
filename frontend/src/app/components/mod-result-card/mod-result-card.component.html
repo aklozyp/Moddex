@@ -1,0 +1,75 @@
+<mat-card class="mod-result-card" (click)="onCardClick()">
+  <div class="mod-result-card__media">
+    <img
+      [ngSrc]="iconSource()"
+      width="72"
+      height="72"
+      [alt]="mod().title"
+      class="mod-result-card__avatar"
+    />
+  </div>
+
+  <div class="mod-result-card__content">
+    <div class="mod-result-card__header">
+      <div class="mod-result-card__titles">
+        <h3 class="mod-result-card__title">{{ mod().title }}</h3>
+        @if (mod().author) {
+          <span class="mod-result-card__subtitle">
+            {{ 'MOD_LIST.BY_AUTHOR' | translate:{ author: mod().author } }}
+          </span>
+        }
+      </div>
+
+      <div class="mod-result-card__primary-action">
+        <button
+          mat-flat-button
+          color="primary"
+          (click)="onAddClick($event)"
+          class="mod-result-card__install"
+          [disabled]="disableActions()"
+          matTooltip="{{ 'MOD_LIST.ADD_TOOLTIP' | translate }}"
+        >
+          <mat-icon>download</mat-icon>
+          {{ 'MOD_LIST.ADD_LABEL' | translate }}
+        </button>
+      </div>
+    </div>
+
+    @if (mod().description) {
+      <p class="mod-result-card__description">{{ mod().description }}</p>
+    }
+
+    <div class="mod-result-card__meta">
+      <div class="mod-result-card__badges">
+        <span class="mod-result-card__badge" [attr.data-provider]="mod().provider">
+          {{ providerLabel(mod().provider) }}
+        </span>
+        @if (mod().server_side === 'unsupported') {
+          <span class="mod-result-card__badge mod-result-card__badge--client">
+            {{ 'MOD_LIST.CLIENT_ONLY' | translate }}
+          </span>
+        }
+      </div>
+
+      <div class="mod-result-card__stats">
+        @if (mod().downloads != null) {
+          <div class="mod-result-card__stat" matTooltip="{{ 'MOD_LIST.DOWNLOADS_TOOLTIP' | translate }}">
+            <mat-icon>download</mat-icon>
+            <span>{{ mod().downloads | number }}</span>
+          </div>
+        }
+
+        @if (mod().latest_version) {
+          <mat-chip
+            color="primary"
+            appearance="filled"
+            selected
+            matTooltip="{{ 'MOD_LIST.LATEST_VERSION_TOOLTIP' | translate }}"
+          >
+            {{ mod().latest_version }}
+          </mat-chip>
+        }
+      </div>
+    </div>
+  </div>
+</mat-card>

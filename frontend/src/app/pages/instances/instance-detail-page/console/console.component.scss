@@ -1,0 +1,67 @@
+.console-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 1rem;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--mat-sys-surface-container);
+  border-radius: 8px;
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: bold;
+    
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #f44336; // Red for stopped
+    }
+
+    &.running .dot {
+      background-color: #4caf50; // Green for running
+    }
+  }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+}
+
+.log-viewport {
+  flex: 1;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  overflow-y: auto;
+  border-radius: 8px;
+  padding: 0.5rem;
+  
+  .log-line {
+    white-space: pre-wrap;
+    line-height: 1.4;
+  }
+}
+
+.command-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+
+  .command-input {
+    flex: 1;
+    margin-bottom: -1.25em; // Fix Material generic spacing
+  }
+}

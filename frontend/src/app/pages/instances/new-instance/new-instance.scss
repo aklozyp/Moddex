@@ -1,0 +1,48 @@
+.general-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.version-selection {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+
+  .version-dropdown {
+    flex: 1;
+  }
+}
+
+.loaders-error {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #d9534f;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+
+  .status {
+    font-size: 0.9rem;
+
+    &.success {
+      color: var(--primary);
+    }
+
+    &.error {
+      color: #d9534f;
+    }
+  }
+}
+
+:host ::ng-deep .mat-mdc-select-panel {
+  background: var(--surface-2);
+}
+
+:host ::ng-deep .mat-mdc-option:hover {
+  background: var(--surface);
+}

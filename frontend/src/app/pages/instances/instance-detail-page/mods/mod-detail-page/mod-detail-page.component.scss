@@ -1,0 +1,245 @@
+.mod-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+
+  &__nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  &__loading,
+  &__error {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: center;
+    padding: 2rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+
+    mat-icon {
+      font-size: 24px;
+    }
+  }
+
+  &__hero {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  &__hero-icon {
+    border-radius: 1rem;
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+  }
+
+  &__hero-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+  }
+
+  &__hero-header {
+    h1 {
+      margin: 0;
+      font-size: 1.8rem;
+    }
+  }
+
+  &__subtitle {
+    margin: 0;
+    color: var(--muted);
+  }
+
+  &__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+
+    .stat {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 0.9rem;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+  }
+
+  &__hero-actions {
+    display: flex;
+    gap: 0.75rem;
+
+    button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  }
+
+  &__content {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+    gap: 1.5rem;
+    align-items: flex-start;
+  }
+
+  &__main,
+  &__aside {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  &__description,
+  &__meta,
+  &__gallery,
+  &__versions {
+    border-radius: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+  }
+
+  &__meta {
+    dl {
+      display: grid;
+      gap: 0.75rem;
+      margin: 0;
+
+      div {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
+      dt {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+
+      dd {
+        margin: 0;
+        font-weight: 500;
+      }
+    }
+  }
+
+  &__gallery {
+    .gallery-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+
+      figure {
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+
+        img {
+          border-radius: 0.75rem;
+          border: 1px solid var(--border);
+          object-fit: cover;
+          width: 100%;
+          height: auto;
+        }
+
+        figcaption {
+          font-size: 0.85rem;
+          color: var(--muted);
+        }
+      }
+    }
+  }
+
+  &__versions-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+
+    h2 {
+      margin: 0;
+    }
+
+    .mod-detail__versions-subtitle {
+      color: var(--muted);
+    }
+  }
+}
+
+.mod-detail__description h2,
+.mod-detail__meta h2,
+.mod-detail__gallery h2,
+.mod-detail__versions h2 {
+  margin-top: 0;
+}
+
+.versions-table {
+  width: 100%;
+  height: 400px;
+
+  .mat-mdc-header-cell {
+    background-color: var(--surface-2);
+  }
+
+  .mat-mdc-cell {
+    border-bottom-color: var(--border);
+  }
+
+  .mat-mdc-row:last-child .mat-mdc-cell {
+    border-bottom: none;
+  }
+}
+
+.versions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  &__empty {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: center;
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    padding: 1.5rem;
+    border-radius: 0.75rem;
+  }
+}
+
+@media (max-width: 1024px) {
+  .mod-detail__content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .mod-detail__hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mod-detail__hero-icon {
+    width: 80px;
+    height: 80px;
+  }
+}

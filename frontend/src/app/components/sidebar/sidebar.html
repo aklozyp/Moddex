@@ -1,0 +1,15 @@
+﻿<nav>
+  @for (item of navigationItems(); track item.path) {
+    <a
+      [routerLink]="item.path"
+      routerLinkActive="active"
+      [class.disabled]="item.disabled"
+      [attr.aria-disabled]="item.disabled ? 'true' : null"
+      [attr.tabindex]="item.disabled ? -1 : 0"
+      (click)="preventWhenDisabled($event, item)"
+      [attr.title]="item.tooltipKey ? (item.tooltipKey | translate) : null"
+    >
+      {{ item.label | translate }}
+    </a>
+  }
+</nav>

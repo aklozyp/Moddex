@@ -1,0 +1,60 @@
+<h2 mat-dialog-title class="dialog-title">
+  <mat-icon class="title-icon" [class.title-icon--critical]="hasCritical()">security</mat-icon>
+  {{ data.titleKey | translate }}
+</h2>
+
+<mat-dialog-content class="dialog-content">
+  <p class="description">{{ data.descriptionKey | translate: data.descriptionParams }}</p>
+
+  @if (data.warnings.length > 0) {
+    <section class="warnings" aria-label="Sicherheitshinweise">
+      @for (warning of data.warnings; track $index) {
+        <div class="warning-item warning-item--{{ warning.level }}" role="alert">
+          <mat-icon class="warning-icon">{{ warningIcon(warning.level) }}</mat-icon>
+          <span>{{ warning.message }}</span>
+        </div>
+      }
+    </section>
+  }
+
+  @if (data.changes && data.changes.length > 0) {
+    <section class="changes">
+      <h3 class="changes-title">{{ 'SECURITY_REVIEW.CHANGES_TITLE' | translate }}</h3>
+      <ul class="change-list">
+        @for (change of data.changes; track $index) {
+          <li class="change-item change-item--{{ change.type }}">
+            <mat-icon class="change-icon">{{ changeIcon(change.type) }}</mat-icon>
+            <span>{{ change.label }}</span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  @if (data.requireCheckbox) {
+    <div class="confirmation-row">
+      <mat-checkbox
+        [checked]="confirmed()"
+        (change)="toggleConfirm($event.checked)"
+        color="warn"
+      >
+        {{ 'SECURITY_REVIEW.CONFIRM_CHECKBOX' | translate }}
+      </mat-checkbox>
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-stroked-button (click)="cancel()">
+    {{ 'CANCEL' | translate }}
+  </button>
+  <button
+    mat-flat-button
+    color="warn"
+    [disabled]="!canConfirm()"
+    (click)="confirm()"
+  >
+    <mat-icon>check</mat-icon>
+    {{ (data.confirmLabelKey ?? 'SECURITY_REVIEW.CONFIRM_ACTION') | translate }}
+  </button>
+</mat-dialog-actions>

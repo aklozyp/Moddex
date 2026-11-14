@@ -1,0 +1,45 @@
+<div id="outer-card-container">
+  <div class="card" [routerLink]="'/instance/' + instance().id">
+    <div id="instance-image" class="card__aside">
+      <mat-icon>hide_image</mat-icon>
+    </div>
+
+    <div class="card__header">
+      <h2>{{ instance().name }}</h2>
+
+      <div class="card__actions">
+        <app-button icon="play_arrow" text="Starten"></app-button>
+        <app-button icon="more_vert"></app-button>
+      </div>
+    </div>
+
+    <div class="card__body">
+      <div class="instance_description">
+        <span class="description">{{ instance().description }}</span>
+      </div>
+    </div>
+
+    <div id="instance-infos" class="card__footer">
+      <div id="instance-categories">
+        @for (category of instance().categories; track category; let last = $last) {
+          <span>{{ category }}</span>
+          @if (!last) { <span class="separator">|</span> }
+        }
+      </div>
+
+      <div id="instance-stats">
+        @if (instance().modsCount != undefined && instance().modsCount! > 0) {
+          <span class="separator">|</span>
+          <span>{{ instance().modsCount }} Mods</span>
+        }
+        <span>{{ instance().gameVersion }}</span>
+        <span class="separator">|</span>
+        <span>{{ instance().modLoader }}</span>
+      </div>
+    </div>
+
+    <div class="card__chevron">
+      <mat-icon>chevron_right</mat-icon>
+    </div>
+  </div>
+</div>

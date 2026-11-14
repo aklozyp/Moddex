@@ -1,0 +1,26 @@
+<div class="instances-grid">
+  @if (loading()) {
+    @for (_ of [].constructor(3); track $index) {
+      <app-instance-card-skeleton />
+    }
+  } @else {
+    <div class="content-wrapper">
+      @if (error()) {
+        <div class="state-info error-state">
+          <h2>{{ 'INSTANCES_LOAD_FAILED' | translate }}</h2>
+          <p>{{ error() }}</p>
+          <app-button text="{{ 'RETRY' | translate }}" icon="refresh" (click)="loadInstances()"/>
+        </div>
+      } @else if (instances().length === 0) {
+        <div class="state-info empty-state">
+          <h2>{{ 'NO_INSTANCES_FOUND' | translate }}</h2>
+          <p>{{ 'NO_INSTANCES_FOUND_DESCRIPTION' | translate }}</p>
+        </div>
+      } @else {
+        @for (instance of instances(); track instance.id) {
+          <app-instance-card [instance]="instance"/>
+        }
+      }
+    </div>
+  }
+</div>

@@ -1,0 +1,56 @@
+<div class="files-container">
+  
+  <!-- Editor Mode -->
+  @if (editingFile()) {
+    <div class="editor">
+      <div class="toolbar">
+        <h3>Editing: {{ editingFile() }}</h3>
+        <div class="actions">
+          <button mat-button (click)="closeEditor()">Cancel</button>
+          <button mat-flat-button color="primary" (click)="saveFile()" [disabled]="isSaving()">Save</button>
+        </div>
+      </div>
+      <textarea [(ngModel)]="fileContent" spellcheck="false"></textarea>
+    </div>
+  } @else {
+    <!-- Browser Mode -->
+    <div class="browser">
+      <div class="toolbar">
+        <button mat-icon-button (click)="navigateUp()" [disabled]="!currentPath()">
+          <mat-icon>arrow_upward</mat-icon>
+        </button>
+        <div class="path-display">
+          /{{ currentPath() }}
+        </div>
+        <button mat-icon-button (click)="loadFiles(currentPath())">
+          <mat-icon>refresh</mat-icon>
+        </button>
+      </div>
+
+      <div class="file-list">
+        @if (isLoading()) {
+          <div class="loading">Loading...</div>
+        }
+
+        @for (entry of files(); track entry.name) {
+          <div class="file-item" (click)="openItem(entry)">
+            <mat-icon class="icon">
+              {{ entry.isDirectory ? 'folder' : 'description' }}
+            </mat-icon>
+            <div class="name">{{ entry.name }}</div>
+            <div class="meta">
+              {{ entry.size }} B
+            </div>
+            <button mat-icon-button class="delete-btn" (click)="deleteItem(entry, $event)">
+              <mat-icon color="warn">delete</mat-icon>
+            </button>
+          </div>
+        }
+        
+        @if (files().length === 0 && !isLoading()) {
+          <div class="empty">Directory is empty</div>
+        }
+      </div>
+    </div>
+  }
+</div>

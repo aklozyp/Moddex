@@ -1,0 +1,76 @@
+<div class="installed-mod-list">
+  @for (mod of mods(); track mod.projectId) {
+    <mat-card class="mod-card" (click)="onView(mod)">
+      <div class="mod-card__header">
+        <div class="mod-card__title-group">
+          <h3 class="mod-card__title">{{ displayName(mod) }}</h3>
+          <p class="mod-card__subtitle">{{ mod.projectSlug || mod.projectId }}</p>
+          <div class="mod-card__badges">
+            <span class="mod-card__badge" [attr.data-provider]="mod.provider">{{ providerLabel(mod.provider) }}</span>
+            @if (mod.clientSideOnly) {
+              <span class="mod-card__badge mod-card__badge--client">{{ 'INSTANCE_MODS.CLIENT_ONLY_BADGE' | translate }}</span>
+            }
+            @if (mod.downloaded === false) {
+              <span class="mod-card__badge mod-card__badge--pending">{{ 'INSTANCE_MODS.NOT_DOWNLOADED_BADGE' | translate }}</span>
+            }
+          </div>
+        </div>
+        <div class="mod-card__version" matTooltip="{{ 'INSTANCE_MODS.VERSION_TOOLTIP' | translate }}">
+          <mat-chip color="primary" appearance="filled" selected>
+            {{ mod.versionNumber || ('INSTANCE_MODS.VERSION_UNKNOWN' | translate) }}
+          </mat-chip>
+          <button
+            mat-icon-button
+            type="button"
+            class="mod-card__download"
+            (click)="onDownload($event, mod)"
+            [disabled]="!mod.downloadUrl"
+            matTooltip="{{ 'INSTANCE_MODS.DOWNLOAD_TOOLTIP' | translate }}"
+            [attr.aria-label]="'INSTANCE_MODS.DOWNLOAD_TOOLTIP' | translate"
+          >
+            <mat-icon>download</mat-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="mod-card__meta">
+        <div class="meta-item">
+          <mat-icon>storage</mat-icon>
+          <span>{{ mod.fileName || ('INSTANCE_MODS.NOT_DOWNLOADED' | translate) }}</span>
+        </div>
+        <div class="meta-item" matTooltip="{{ 'INSTANCE_MODS.INSTALLED_AT_TOOLTIP' | translate }}">
+          <mat-icon>schedule</mat-icon>
+          <span>{{ mod.installedAt | date: 'medium' }}</span>
+        </div>
+        <div class="meta-item" matTooltip="{{ 'INSTANCE_MODS.DEPENDENCIES_TOOLTIP' | translate }}">
+          <mat-icon>hub</mat-icon>
+          <span>{{ mod.dependencies.length }}</span>
+        </div>
+      </div>
+
+      <mat-divider></mat-divider>
+
+      <div class="mod-card__actions">
+        <button mat-stroked-button color="primary" type="button" (click)="onView(mod)">
+          <mat-icon>info</mat-icon>
+          {{ 'INSTANCE_MODS.ACTION_VIEW' | translate }}
+        </button>
+        <button
+          mat-icon-button
+          type="button"
+          [matTooltip]="'INSTANCE_MODS.ACTION_REMOVE' | translate"
+          [disabled]="disableActions() || isRemoving(mod)"
+          (click)="onRemove($event, mod)"
+        >
+          <mat-icon *ngIf="!isRemoving(mod)">delete</mat-icon>
+          <mat-icon *ngIf="isRemoving(mod)">hourglass_top</mat-icon>
+        </button>
+      </div>
+    </mat-card>
+  } @empty {
+    <div class="empty-state">
+      <mat-icon>extension_off</mat-icon>
+      <p>{{ 'INSTANCE_MODS.EMPTY_STATE' | translate }}</p>
+    </div>
+  }
+</div>

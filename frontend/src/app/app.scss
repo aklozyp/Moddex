@@ -1,0 +1,15 @@
+#outer-padding {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  padding: 0.8rem;
+  background: var(--bg);
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100vh;
+  gap: 1rem;
+}
+
+.auth-checking {
+  color: var(--muted);
+}

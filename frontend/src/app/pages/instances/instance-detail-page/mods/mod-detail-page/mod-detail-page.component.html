@@ -1,0 +1,214 @@
+<div class="mod-detail">
+  <div class="mod-detail__nav">
+    <button mat-button (click)="navigateToInstalled()">
+      <mat-icon>arrow_back</mat-icon>
+      {{ 'MOD_DETAIL.BACK_TO_OVERVIEW' | translate }}
+    </button>
+    <button mat-button (click)="navigateToAdd()">
+      <mat-icon>playlist_add</mat-icon>
+      {{ 'MOD_DETAIL.BACK_TO_ADD' | translate }}
+    </button>
+  </div>
+
+  @if (isLoading()) {
+    <div class="mod-detail__loading">
+      <mat-progress-spinner mode="indeterminate" diameter="56"></mat-progress-spinner>
+      <p>{{ 'MOD_DETAIL.LOADING' | translate }}</p>
+    </div>
+  } @else if (errorMessage(); as error) {
+    <div class="mod-detail__error">
+      <mat-icon>error_outline</mat-icon>
+      <span>{{ error }}</span>
+    </div>
+  } @else if (project(); as project) {
+    <section class="mod-detail__hero">
+      <img
+        class="mod-detail__hero-icon"
+        [ngSrc]="project.icon_url || './assets/images/default-mod-icon.png'"
+        [alt]="project.title"
+        width="96"
+        height="96"
+      />
+      <div class="mod-detail__hero-content">
+        <div class="mod-detail__hero-header">
+          <h1>{{ project.title }}</h1>
+          <p class="mod-detail__subtitle">
+            {{ project.description }}
+          </p>
+        </div>
+
+        <div class="mod-detail__stats">
+          <div class="stat" matTooltip="{{ 'MOD_DETAIL.STATS_DOWNLOADS' | translate }}">
+            <mat-icon>download</mat-icon>
+            <span>{{ project.downloads | number }}</span>
+          </div>
+          <div class="stat" matTooltip="{{ 'MOD_DETAIL.STATS_FOLLOWERS' | translate }}">
+            <mat-icon>favorite</mat-icon>
+            <span>{{ project.followers | number }}</span>
+          </div>
+          <div class="stat" matTooltip="{{ 'MOD_DETAIL.STATS_UPDATED' | translate }}">
+            <mat-icon>update</mat-icon>
+            <span>{{ project.updated | date: 'medium' }}</span>
+          </div>
+        </div>
+
+        <div class="mod-detail__hero-actions">
+          <button mat-flat-button color="primary" (click)="installLatest()" [disabled]="installingLatest()">
+            <mat-icon *ngIf="!installingLatest()">download</mat-icon>
+            <mat-progress-spinner *ngIf="installingLatest()" diameter="20" mode="indeterminate"></mat-progress-spinner>
+            {{ 'MOD_DETAIL.INSTALL_LATEST' | translate }}
+          </button>
+          <button mat-stroked-button (click)="openModrinthProject(project.slug)">
+            <mat-icon>open_in_new</mat-icon>
+            {{ 'MOD_DETAIL.OPEN_MODRINTH' | translate }}
+          </button>
+        </div>
+
+        <mat-chip-set aria-label="{{ 'MOD_DETAIL.CATEGORIES_ARIA' | translate }}">
+          @for (category of project.categories; track category) {
+            <mat-chip>{{ category }}</mat-chip>
+          }
+        </mat-chip-set>
+      </div>
+    </section>
+
+    <div class="mod-detail__content">
+      <div class="mod-detail__main">
+        <section class="mod-detail__description" aria-label="{{ 'MOD_DETAIL.DESCRIPTION' | translate }}">
+          <h2>{{ 'MOD_DETAIL.DESCRIPTION' | translate }}</h2>
+          @if (project.body) {
+            <div [innerHTML]="project.body | markdown"></div>
+          }
+        </section>
+
+        @if (project.gallery?.length) {
+          <section class="mod-detail__gallery" aria-label="{{ 'MOD_DETAIL.GALLERY' | translate }}">
+            <h2>{{ 'MOD_DETAIL.GALLERY' | translate }}</h2>
+            <div class="gallery-grid">
+              @for (image of project.gallery; track image.url) {
+                <figure>
+                  <img
+                    [ngSrc]="image.url"
+                    [alt]="image.title || project.title"
+                    width="320"
+                    height="180"
+                  />
+                  @if (image.title) {
+                    <figcaption>{{ image.title }}</figcaption>
+                  }
+                </figure>
+              }
+            </div>
+          </section>
+        }
+      </div>
+
+      <div class="mod-detail__aside">
+        <section class="mod-detail__meta" aria-label="{{ 'MOD_DETAIL.META_TITLE' | translate }}">
+          <h2>{{ 'MOD_DETAIL.META_TITLE' | translate }}</h2>
+          <dl>
+            <div>
+              <dt>{{ 'MOD_DETAIL.META_AUTHOR' | translate }}</dt>
+              <dd>{{ project.team }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'MOD_DETAIL.META_PROJECT_ID' | translate }}</dt>
+              <dd>{{ project.id }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'MOD_DETAIL.META_LICENSE' | translate }}</dt>
+              <dd>{{ project.license?.name }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'MOD_DETAIL.META_CLIENT' | translate }}</dt>
+              <dd>{{ project.client_side }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'MOD_DETAIL.META_SERVER' | translate }}</dt>
+              <dd>{{ project.server_side }}</dd>
+            </div>
+            <div>
+              <dt>{{ 'MOD_DETAIL.META_PUBLISHED' | translate }}</dt>
+              <dd>{{ project.published | date: 'mediumDate' }}</dd>
+            </div>
+                  </dl>
+                </section>
+          
+                @if (installedVersion(); as version) {
+                  <section class="mod-detail__meta" aria-label="{{ 'MOD_DETAIL.INSTALLED_VERSION_TITLE' | translate }}">
+                    <h2>{{ 'MOD_DETAIL.INSTALLED_VERSION_TITLE' | translate }}</h2>
+                    <dl>
+                      <div>
+                        <dt>{{ 'MOD_DETAIL.VERSION_TABLE_NAME' | translate }}</dt>
+                        <dd>{{ version.name }}</dd>
+                      </div>
+                      <div>
+                        <dt>{{ 'MOD_DETAIL.VERSION_TABLE_VERSION' | translate }}</dt>
+                        <dd>{{ version.version_number }}</dd>
+                      </div>
+                      <div>
+                        <dt>{{ 'MOD_DETAIL.VERSION_TABLE_DATE' | translate }}</dt>
+                        <dd>{{ version.date_published | date:'mediumDate' }}</dd>
+                      </div>
+                    </dl>
+                  </section>
+                }
+          
+                  <section class="mod-detail__versions" aria-label="{{ 'MOD_DETAIL.VERSIONS_TITLE' | translate }}">          <div class="mod-detail__versions-header">
+            <h2>{{ 'MOD_DETAIL.VERSIONS_TITLE' | translate:{ count: versions().length } }}</h2>
+            <span class="mod-detail__versions-subtitle">{{ 'MOD_DETAIL.VERSIONS_SUBTITLE' | translate }}</span>
+          </div>
+          <div class="versions-list">
+            <table mat-table [dataSource]="versions()" class="versions-table">
+
+              <!-- Name Column -->
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef> {{ 'MOD_DETAIL.VERSION_TABLE_NAME' | translate }} </th>
+                <td mat-cell *matCellDef="let version"> {{version.name}} </td>
+              </ng-container>
+
+              <!-- Version Column -->
+              <ng-container matColumnDef="version">
+                <th mat-header-cell *matHeaderCellDef> {{ 'MOD_DETAIL.VERSION_TABLE_VERSION' | translate }} </th>
+                <td mat-cell *matCellDef="let version"> {{version.version_number}} </td>
+              </ng-container>
+
+              <!-- Date Column -->
+              <ng-container matColumnDef="date">
+                <th mat-header-cell *matHeaderCellDef> {{ 'MOD_DETAIL.VERSION_TABLE_DATE' | translate }} </th>
+                <td mat-cell *matCellDef="let version"> {{version.date_published | date:'mediumDate'}} </td>
+              </ng-container>
+
+              <!-- Actions Column -->
+              <ng-container matColumnDef="actions">
+                <th mat-header-cell *matHeaderCellDef></th>
+                <td mat-cell *matCellDef="let version">
+                  <button
+                    mat-stroked-button
+                    color="primary"
+                    (click)="installSpecificVersion(version)"
+                    [disabled]="installingVersionId() === version.id"
+                  >
+                    <mat-icon *ngIf="installingVersionId() !== version.id">download_for_offline</mat-icon>
+                    <mat-progress-spinner *ngIf="installingVersionId() === version.id" diameter="20" mode="indeterminate"></mat-progress-spinner>
+                    {{ 'MOD_DETAIL.INSTALL_VERSION' | translate }}
+                  </button>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+              <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+            </table>
+
+            @if (!versions().length) {
+              <div class="versions-list__empty">
+                <mat-icon>info</mat-icon>
+                <p>{{ 'MOD_DETAIL.NO_VERSIONS' | translate }}</p>
+              </div>
+            }
+          </div>
+        </section>
+      </div>
+    </div>
+  }
+</div>

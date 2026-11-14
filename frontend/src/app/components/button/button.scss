@@ -1,0 +1,46 @@
+﻿.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s ease-in-out;
+
+  &.normal {
+    background-color: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+
+    &:hover {
+      background-color: var(--surface-3);
+    }
+  }
+
+  &.primary {
+    background-color: var(--primary);
+    color: var(--on-primary);
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  &.optional {
+    background-color: transparent;
+    color: var(--muted);
+
+    &:hover {
+      background-color: var(--surface-2);
+      color: var(--text);
+    }
+  }
+
+  &:disabled,
+  &.disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}

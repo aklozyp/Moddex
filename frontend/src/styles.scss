@@ -1,0 +1,265 @@
+@use "sass:color";
+@use "sass:meta";
+@use '@angular/material' as mat;
+
+
+body {
+  font-family: 'Roboto', sans-serif;
+}
+
+body {
+  color-scheme: light;
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  margin: 0;
+}
+
+$base-colors: (
+  "white":      #e9ecec,
+  "light-gray": #8e8e86,
+  "gray":       #3e4447,
+  "black":      #141519,
+  "brown":      #724728,
+  "red":        #a02722,
+  "orange":     #f07613,
+  "yellow":     #f8c527,
+  "lime":       #70b919,
+  "green":      #546d1b,
+  "cyan":       #158991,
+  "light-blue": #3aafd9,
+  "blue":       #35399d,
+  "purple":     #792aac,
+  "magenta":    #bd44b3,
+  "pink":       #ed8dac
+);
+
+/* Pastell-/Matte-Helper */
+@function generate-pastel-color($c, $lighten: 68%, $desat: 14%) {
+  @return color.mix(white, color.adjust($c, $saturation: -$desat), $lighten);
+}
+@function generate-text-color($bg) {
+  @return if(color.channel($bg, "lightness", $space: hsl) > 60%, rgba(0,0,0,.86), rgba(255,255,255,.92));
+}
+
+@mixin colored-theme-vars($name, $base) {
+  $bg: generate-pastel-color($base, 80%, 22%);                                // Main Background
+  $surface: generate-pastel-color($base, 74%, 20%);                           // Cards/Surfaces
+  $surface-2: generate-pastel-color($base, 66%, 18%);                         // Deeper Surfaces
+  $primary: generate-pastel-color($base, 54%, 12%);                           // Primary (Buttons)
+  $accent: color.adjust(generate-pastel-color($base, 50%, 10%), $hue: 16deg); // Accent
+  $text: generate-text-color($bg);
+  $muted:  color.mix($text, $bg, 55%);                                        // Darker Text
+  $border: color.mix(black, $surface, 16%);                                   // Small Border
+  $border-strong: color.mix(black, $surface, 24%);                            // Strong Border
+  $focus:  color.change($primary, $alpha: .42);                               // Focus
+
+  [data-theme="theme-#{$name}"] {
+    /* Tokens */
+    --bg: #{$bg};
+    --surface: #{$surface};
+    --surface-2: #{$surface-2};
+    --primary: #{$primary};
+    --on-primary: #{generate-text-color($primary)};
+    --accent: #{$accent};
+    --text: #{$text};
+    --muted: #{$muted};
+    --border: #{$border};
+    --border-strong: #{$border-strong};
+    --focus: #{$focus};
+    --shadow: 0 2px 10px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+
+    color: var(--text);
+    background: var(--bg);
+  }
+
+  /* Example Components */
+  [data-theme="theme-#{$name}"] .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+  }
+  [data-theme="theme-#{$name}"] .btn {
+    background: var(--primary);
+    color: var(--on-primary);
+    border: 1px solid var(--border-strong);
+  }
+  [data-theme="theme-#{$name}"] .btn-accent {
+    background: var(--accent);
+  }
+}
+
+/* Generate all 16 Themes */
+@each $name, $hex in $base-colors {
+  @include colored-theme-vars($name, $hex);
+}
+
+/* Fallback for �klassisch light/dark� */
+[data-theme="light"] {
+  --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f1f3f5;
+  --primary: #6b8af7; --accent: #ffb3c1;
+  --text: rgba(0,0,0,.86); --muted: rgba(0,0,0,.55);
+  --border: rgba(0,0,0,.12); --border-strong: rgba(0,0,0,.18);
+  --focus: rgba(107,138,247,.35); --shadow: 0 2px 10px rgba(0,0,0,.06);
+  color: var(--text);
+  background: var(--bg);
+}
+[data-theme="dark"] {
+  --bg: #0f1115; --surface: #151821; --surface-2: #1b1f2a;
+  --primary: #6b8af7; --accent: #ff99aa;
+  --text: rgba(255,255,255,.92); --muted: rgba(255,255,255,.62);
+  --border: rgba(255,255,255,.12); --border-strong: rgba(255,255,255,.18);
+  --focus: rgba(107,138,247,.4); --shadow: 0 2px 14px rgba(0,0,0,.45);
+  color: var(--text);
+  background: var(--bg);
+}
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+
+.snackbar-error {
+  background: #da4c51 !important;
+  color: #ffffff !important;
+
+  .mdc-button__label {
+    color: #ffffff !important;
+    font-weight: 600;
+  }
+}
+
+
+.mat-mdc-menu-panel, .mat-mdc-select-panel {
+  border-radius: 0.65rem !important;
+  background: var(--surface) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.mat-mdc-menu-item, .mat-mdc-option {
+  color: var(--text) !important;
+}
+
+.mat-mdc-menu-item:hover, .mat-mdc-option.mdc-list-item--selected, .mat-mdc-option:hover {
+  background: var(--surface-2) !important;
+}
+
+.mat-mdc-form-field {
+  --mdc-outlined-text-field-container-shape: 0.95rem;
+  --mdc-outlined-text-field-outline-width: 1px;
+  --mdc-outlined-text-field-outline-color: color-mix(in srgb, var(--border) 88%, transparent);
+  --mdc-outlined-text-field-hover-outline-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  --mdc-outlined-text-field-focus-outline-color: var(--primary);
+  --mdc-outlined-text-field-disabled-outline-color: color-mix(in srgb, var(--border) 55%, transparent);
+  --mdc-outlined-text-field-container-color: color-mix(in srgb, var(--surface) 96%, transparent);
+  --mdc-outlined-text-field-input-text-color: var(--text);
+  --mat-mdc-form-field-floating-label-color: color-mix(in srgb, var(--muted) 80%, transparent);
+  --mat-mdc-form-field-subscript-text-color: color-mix(in srgb, var(--muted) 75%, transparent);
+
+  width: 100%;
+  
+  .mdc-text-field--outlined {
+    border-radius: 0.95rem;
+    background: color-mix(in srgb, var(--surface) 98%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 78%, transparent);
+    transition: box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
+    min-height: 56px;
+  }
+
+  .mdc-text-field--outlined .mdc-notched-outline__leading,
+  .mdc-text-field--outlined .mdc-notched-outline__trailing,
+  .mdc-text-field--outlined .mdc-notched-outline__notch {
+    border-color: color-mix(in srgb, var(--border-strong) 75%, transparent) !important;
+    border-width: 1px;
+    transition: border-color 0.2s ease;
+  }
+
+  &:hover .mdc-text-field--outlined {
+    background: color-mix(in srgb, var(--surface) 99%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 24%, var(--border));
+  }
+
+  &:hover .mdc-text-field--outlined .mdc-notched-outline__leading,
+  &:hover .mdc-text-field--outlined .mdc-notched-outline__trailing,
+  &:hover .mdc-text-field--outlined .mdc-notched-outline__notch {
+    border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  }
+
+  .mdc-text-field--outlined.mdc-text-field--focused,
+  &.mat-focused .mdc-text-field--outlined {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 65%, transparent);
+    background: var(--surface);
+  }
+
+  .mdc-text-field__input {
+    font-size: 0.95rem;
+    padding: 0.35rem 0;
+  }
+
+  .mat-mdc-form-field-infix {
+    padding: 0.6rem 0.75rem 0.4rem;
+  }
+
+  .mat-mdc-form-field-icon-prefix,
+  .mat-mdc-form-field-icon-suffix {
+    color: color-mix(in srgb, var(--muted) 75%, transparent);
+  }
+}
+
+.mat-mdc-select {
+  --mdc-outlined-text-field-container-color: color-mix(in srgb, var(--surface) 98%, transparent);
+  --mdc-outlined-text-field-input-text-color: var(--text);
+}
+
+.mat-mdc-select-trigger {
+  min-height: 56px;
+}
+
+
+.mat-mdc-select-arrow {
+  color: var(--muted) !important;
+}
+
+.mat-mdc-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.mat-mdc-select-value-text {
+  font-size: 0.95rem;
+}
+
+
+
+.card {
+  display: grid;
+  grid-template-areas:
+    "aside header chevron"
+    "aside body   chevron"
+    "aside footer chevron";
+  grid-template-columns: 140px 1fr;
+  grid-template-rows: auto 1fr auto;
+
+  width: calc(100% - (13px * 2));
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  padding: 12px;
+  background: var(--surface);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.mat-mdc-form-field .mdc-text-field,
+.mat-mdc-form-field .mdc-notched-outline,
+.mat-mdc-menu-panel,
+.mat-mdc-select-panel,
+.mat-mdc-select-panel .mat-mdc-option,
+.mat-mdc-paginator .mdc-text-field {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+

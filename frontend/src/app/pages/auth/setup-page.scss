@@ -1,0 +1,29 @@
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: var(--mat-sys-background);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 500px;
+  padding: 1rem;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.error {
+  color: var(--mat-sys-error);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+mat-card-header {
+  margin-bottom: 1rem;
+  justify-content: center;
+  text-align: center;
+}

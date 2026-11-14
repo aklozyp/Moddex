@@ -1,0 +1,13 @@
+﻿<button
+  type="button"
+  [class]="'btn ' + styleType"
+  [class.disabled]="disabled"
+  [disabled]="disabled"
+>
+  @if (icon) {
+    <mat-icon>{{ icon }}</mat-icon>
+  }
+  @if (text) {
+    <span>{{ text }}</span>
+  }
+</button>

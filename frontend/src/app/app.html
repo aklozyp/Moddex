@@ -1,0 +1,13 @@
+<div id="outer-padding">
+  <app-navbar></app-navbar>
+  @if (authService.isChecking()) {
+    <div class="auth-checking" role="status">
+      {{ 'AUTH.CHECKING' | translate }}
+    </div>
+  }
+  <router-outlet></router-outlet>
+</div>
+
+@if (settingsService.isDirty()) {
+  <app-save-bar (save)="settingsService.save()" (discard)="settingsService.discard()"></app-save-bar>
+}

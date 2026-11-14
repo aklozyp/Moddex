@@ -1,0 +1,38 @@
+<div class="mod-list">
+  @if (loading() && !mods().length) {
+    <div class="mod-list__skeletons">
+      @for (_ of skeletons(); track $index) {
+        <app-mod-card-skeleton></app-mod-card-skeleton>
+      }
+    </div>
+  } @else {
+    <div class="mod-list__items">
+      @for (mod of mods(); track mod.project_id) {
+        <div class="mod-list__item">
+          <app-mod-result-card
+            [mod]="mod"
+            (add)="onAddMod(mod)"
+            (showDetails)="onShowDetails($event)"
+          ></app-mod-result-card>
+        </div>
+      }
+      @if (virtualScroll()) {
+        <div #sentinel class="mod-list__sentinel" aria-hidden="true"></div>
+      }
+    </div>
+  }
+
+  @if (showEmptyState() && !mods().length) {
+    <div class="mod-list__empty">
+      <mat-icon>extension_off</mat-icon>
+      <p>{{ 'MOD_LIST.EMPTY' | translate }}</p>
+    </div>
+  }
+
+  @if (virtualScroll() && loadingMore()) {
+    <div class="mod-list__loading-more" aria-live="polite">
+      <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+      <span>{{ 'MOD_LIST.LOADING_MORE' | translate }}</span>
+    </div>
+  }
+</div>

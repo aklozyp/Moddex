@@ -1,0 +1,9 @@
+<div class="error-container">
+  <div class="error-card">
+    <h1 class="error-title">{{ 'ERROR.TITLE' | translate }}</h1>
+    <p class="error-message">
+      {{ 'ERROR.MESSAGE' | translate }} <span class="not-found-path">{{ notFoundPath() }}</span>
+    </p>
+    <a routerLink="/" mat-raised-button color="primary">{{ 'ERROR.GO_HOME' | translate }}</a>
+  </div>
+</div>

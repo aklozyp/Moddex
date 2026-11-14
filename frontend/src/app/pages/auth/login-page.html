@@ -1,0 +1,32 @@
+<div class="auth-container">
+  <mat-card class="auth-card">
+    <mat-card-header>
+      <mat-card-title>Moddex Login</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      @if (isUnreachable()) {
+        <div class="session-warning" role="alert">
+          <p>{{ 'AUTH.BACKEND_UNREACHABLE' | translate }}</p>
+          <button mat-stroked-button color="primary" class="full-width" (click)="retrySessionCheck()" [disabled]="isRetryingSessionCheck()">
+            {{ 'RETRY' | translate }}
+          </button>
+        </div>
+      }
+      <form (submit)="login()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Password</mat-label>
+          <input matInput type="password" [(ngModel)]="password" name="password" required>
+        </mat-form-field>
+
+        @if (error()) {
+          <div class="error">{{ error() }}</div>
+        }
+      </form>
+    </mat-card-content>
+    <mat-card-actions>
+      <button mat-flat-button color="primary" class="full-width" (click)="login()" [disabled]="isLoading()">
+        Login
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

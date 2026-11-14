@@ -1,0 +1,46 @@
+<div class="console-container">
+  <div class="toolbar">
+    <div class="status-indicator" [class.running]="status() === 'RUNNING'">
+      <span class="dot"></span>
+      {{ status() }}
+    </div>
+    
+    <div class="actions">
+      <button mat-flat-button color="primary" (click)="start()" [disabled]="status() === 'RUNNING'">
+        <mat-icon>play_arrow</mat-icon> Start
+      </button>
+      <button mat-stroked-button color="warn" (click)="stop()" [disabled]="status() !== 'RUNNING'">
+        <mat-icon>stop</mat-icon> Stop
+      </button>
+      <button mat-icon-button color="warn" (click)="kill()" [disabled]="status() !== 'RUNNING'" title="Kill Process">
+        <mat-icon>dangerous</mat-icon>
+      </button>
+    </div>
+  </div>
+
+  <div class="log-viewport" #logContainer>
+    <div class="log-content">
+      @for (line of logs(); track $index) {
+        <div class="log-line">{{ line }}</div>
+      }
+    </div>
+  </div>
+
+  <div class="command-bar">
+    <mat-form-field appearance="outline" class="command-input">
+      <mat-label>Command</mat-label>
+      <input matInput 
+             [(ngModel)]="commandInput" 
+             (keydown.enter)="sendCommand()"
+             [disabled]="status() !== 'RUNNING'"
+             autocomplete="off">
+      <button mat-icon-button matSuffix (click)="sendCommand()" [disabled]="!commandInput() || status() !== 'RUNNING'">
+        <mat-icon>send</mat-icon>
+      </button>
+    </mat-form-field>
+    
+    <button mat-icon-button (click)="autoScroll.set(!autoScroll())" [color]="autoScroll() ? 'primary' : ''" title="Auto-scroll">
+      <mat-icon>vertical_align_bottom</mat-icon>
+    </button>
+  </div>
+</div>

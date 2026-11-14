@@ -1,0 +1,12 @@
+# Ergebnis von scripts/build-bundle.sh
+/build/
+/.idea/material_theme_project_new.xml
+/.idea/compiler.xml
+/.idea/discord.xml
+/.idea/encodings.xml
+/.idea/kotlinc.xml
+/.idea/jarRepositories.xml
+/.idea/misc.xml
+/.idea/moddex-dev.iml
+/.idea/modules.xml
+/.idea/vcs.xml

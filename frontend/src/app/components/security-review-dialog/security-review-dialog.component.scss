@@ -1,0 +1,138 @@
+:host {
+  display: block;
+}
+
+.dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.title-icon {
+  color: var(--mat-sys-primary);
+
+  &--critical {
+    color: var(--mat-sys-error);
+  }
+}
+
+.dialog-content {
+  min-width: 400px;
+  max-width: 560px;
+}
+
+.description {
+  margin-bottom: 16px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.warning-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+
+  &--critical {
+    background: color-mix(in srgb, var(--mat-sys-error) 12%, transparent);
+    color: var(--mat-sys-error);
+
+    .warning-icon {
+      color: var(--mat-sys-error);
+    }
+  }
+
+  &--warning {
+    background: color-mix(in srgb, #ff9800 12%, transparent);
+    color: #e65100;
+
+    .warning-icon {
+      color: #ff9800;
+    }
+  }
+
+  &--info {
+    background: color-mix(in srgb, var(--mat-sys-primary) 10%, transparent);
+    color: var(--mat-sys-primary);
+
+    .warning-icon {
+      color: var(--mat-sys-primary);
+    }
+  }
+}
+
+.warning-icon {
+  flex-shrink: 0;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+}
+
+.changes {
+  margin-bottom: 16px;
+}
+
+.changes-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--mat-sys-on-surface);
+}
+
+.change-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.change-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  padding: 4px 0;
+
+  &--add .change-icon {
+    color: #4caf50;
+  }
+
+  &--remove .change-icon {
+    color: var(--mat-sys-error);
+  }
+
+  &--update .change-icon {
+    color: #ff9800;
+  }
+
+  &--overwrite .change-icon {
+    color: #9c27b0;
+  }
+}
+
+.change-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.confirmation-row {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}

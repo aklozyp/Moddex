@@ -1,0 +1,172 @@
+﻿@if (!projectCreated()) {
+  <div class="locked-message">{{ 'SERVER_PROPERTIES.LOCKED' | translate }}</div>
+} @else {
+  @if (!serverProperties()) {
+    <div class="loading-message">{{ 'SERVER_PROPERTIES.LOADING' | translate }}</div>
+  } @else {
+    <div class="properties-overview">
+      <article class="overview-card">
+        <mat-icon>category</mat-icon>
+        <div class="overview-card__content">
+          <span class="overview-card__label">{{ 'SERVER_PROPERTIES.STATS_CATEGORIES' | translate }}</span>
+          <span class="overview-card__value">{{ propertyStats().categories }}</span>
+          <span class="overview-card__hint">{{ 'SERVER_PROPERTIES.STATS_CATEGORIES_HINT' | translate }}</span>
+        </div>
+      </article>
+      <article class="overview-card">
+        <mat-icon>list_alt</mat-icon>
+        <div class="overview-card__content">
+          <span class="overview-card__label">{{ 'SERVER_PROPERTIES.STATS_ENTRIES' | translate }}</span>
+          <span class="overview-card__value">{{ propertyStats().total }}</span>
+          <span class="overview-card__hint">{{ 'SERVER_PROPERTIES.STATS_ENTRIES_HINT' | translate }}</span>
+        </div>
+      </article>
+      <article class="overview-card">
+        <mat-icon>toggle_on</mat-icon>
+        <div class="overview-card__content">
+          <span class="overview-card__label">{{ 'SERVER_PROPERTIES.STATS_TOGGLES' | translate }}</span>
+          <span class="overview-card__value">{{ propertyStats().toggles }}</span>
+          <span class="overview-card__hint">{{ 'SERVER_PROPERTIES.STATS_TOGGLES_HINT' | translate }}</span>
+        </div>
+      </article>
+      <article class="overview-card">
+        <mat-icon>history</mat-icon>
+        <div class="overview-card__content">
+          <span class="overview-card__label">{{ 'SERVER_PROPERTIES.STATS_CHANGED' | translate }}</span>
+          <span class="overview-card__value">{{ propertyStats().changed + pendingDraftCount() }}</span>
+          <span class="overview-card__hint">{{ 'SERVER_PROPERTIES.STATS_CHANGED_HINT' | translate:{ pending: pendingDraftCount() } }}</span>
+        </div>
+      </article>
+    </div>
+
+    <div class="properties-container">
+      @for (category of serverProperties()!.categories; track category.id) {
+        <section class="category" [class.other]="category.isOther">
+          <div class="category-header">
+            <h3>{{ category.labelKey | translate }}</h3>
+            @if (category.descriptionKey) {
+              <p class="category-description">{{ category.descriptionKey | translate }}</p>
+            }
+          </div>
+
+          <div class="entries">
+            @for (entry of category.entries; track entry.key) {
+              <div class="entry" [class.changed]="isChanged(entry)" [class.external]="hasServerSideChange(entry)">
+                <div class="entry-info">
+                  <div class="entry-label">{{ entry.labelKey | translate }}</div>
+                  @if (entry.helpKey) {
+                    <div class="entry-help">{{ entry.helpKey | translate }}</div>
+                  }
+                  <div class="entry-tags">
+                    @if (hasServerSideChange(entry)) {
+                      <span class="entry-badge entry-badge--live">{{ 'SERVER_PROPERTIES.BADGE_SERVER_CHANGED' | translate }}</span>
+                    }
+                    @if (isChanged(entry)) {
+                      <span class="entry-badge entry-badge--draft">{{ 'SERVER_PROPERTIES.BADGE_PENDING' | translate }}</span>
+                    }
+                    @if (hasDefault(entry)) {
+                      <span class="entry-default">
+                        <mat-icon>flag</mat-icon>
+                        {{ 'SERVER_PROPERTIES.DEFAULT_LABEL' | translate }}:
+                        <strong>
+                          @switch (entry.type) {
+                            @case ('BOOLEAN') {
+                              {{ entry.defaultValue ? ('COMMON.YES' | translate) : ('COMMON.NO' | translate) }}
+                            }
+                            @default {
+                              {{ entry.defaultValue }}
+                            }
+                          }
+                        </strong>
+                      </span>
+                    }
+                  </div>
+                </div>
+
+                <div
+                  class="entry-control"
+                  [class.editable]="isStringLike(entry)"
+                  (mouseenter)="isStringLike(entry) && startEditing(entry.key)"
+                  (mouseleave)="isStringLike(entry) && stopEditing(entry.key)"
+                >
+                  @switch (entry.type) {
+                    @case ('BOOLEAN') {
+                      <mat-slide-toggle
+                        [checked]="booleanValue(entry)"
+                        (change)="handleBooleanChange(entry, $event.checked)"
+                        [disabled]="isSaving() || isResetting()"
+                      >
+                        {{ booleanValue(entry) ? ('COMMON.YES' | translate) : ('COMMON.NO' | translate) }}
+                      </mat-slide-toggle>
+                    }
+                    @case ('ENUM') {
+                      @if (entry.enumValues?.length) {
+                        <mat-form-field appearance="outline" class="enum-field">
+                          <mat-select
+                            [value]="stringValue(entry)"
+                            (selectionChange)="handleEnumChange(entry, $event.value)"
+                            [disabled]="isSaving() || isResetting()"
+                          >
+                            @for (option of entry.enumValues; track option) {
+                              <mat-option [value]="option">{{ option }}</mat-option>
+                            }
+                          </mat-select>
+                        </mat-form-field>
+                      } @else {
+                        <span class="text-value placeholder">{{ 'SERVER_PROPERTIES.VALUE_EMPTY' | translate }}</span>
+                      }
+                    }
+                    @default {
+                      @if (isEditing(entry)) {
+                        <input
+                          class="entry-input"
+                          [type]="entry.type === 'INTEGER' ? 'number' : 'text'"
+                          [value]="stringValue(entry)"
+                          (input)="onTextInput(entry, $event)"
+                          (blur)="stopEditing(entry.key)"
+                          [disabled]="isSaving()"
+                        />
+                      } @else {
+                        <span class="text-value" [class.placeholder]="isEmpty(entry)" tabindex="0" (focus)="isStringLike(entry) && startEditing(entry.key)">
+                          @if (isEmpty(entry)) {
+                            {{ 'SERVER_PROPERTIES.VALUE_EMPTY' | translate }}
+                          } @else {
+                            {{ stringValue(entry) }}
+                          }
+                        </span>
+                      }
+                    }
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+      }
+    </div>
+
+    <div class="advanced-footer">
+      <div class="status-messages">
+        @if (successMessage()) {
+          <span class="status success">{{ successMessage() | translate }}</span>
+        }
+        @if (errorMessage()) {
+          <span class="status error">{{ errorMessage() | translate }}</span>
+        }
+      </div>
+      <app-button
+        styleType="optional"
+        [text]="'SERVER_PROPERTIES.RESET_TO_ORIGINAL' | translate"
+        [disabled]="isSaving() || isResetting()"
+        (click)="resetToOriginal()"
+      ></app-button>
+    </div>
+
+    @if (hasChanges()) {
+      <app-save-bar
+        (save)="saveChanges()"
+        (discard)="discardChanges()"
+      ></app-save-bar>
+    }
+  }
+}

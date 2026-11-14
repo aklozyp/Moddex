@@ -1,0 +1,17 @@
+<div id="navbar">
+  <div class="nav-items-left">
+    <a routerLink="/home" class="nav-item">
+      <h1>{{moddexService.serverName}}</h1>
+    </a>
+  </div>
+
+  <div class="nav-items-right">
+    <button routerLink="/new-instance" class="btn btn-accent create-modpack-btn">
+      <mat-icon>add</mat-icon>
+      <span>{{ 'CREATE_NEW_PROJECT' | translate }}</span>
+    </button>
+    <a routerLink="/settings" class="settings-btn">
+      <mat-icon>settings</mat-icon>
+    </a>
+  </div>
+</div>

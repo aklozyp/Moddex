@@ -1,0 +1,6 @@
+<div class="save-bar-container">
+  <div class="save-bar">
+    <app-button (click)="discard.emit()" styleType="optional" text="{{ 'DISCARD' | translate }}" icon="close"></app-button>
+    <app-button (click)="save.emit()" styleType="primary" text="{{ 'SAVE_CHANGES' | translate }}" icon="save"></app-button>
+  </div>
+</div>

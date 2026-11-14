@@ -10,10 +10,18 @@ Environment=MODDEX_ROOT=/var/lib/moddex
 Environment=MODDEX_LOG_DIR=/var/lib/moddex/logs
 Environment=SERVER_ADDRESS=127.0.0.1
 Environment=SERVER_PORT=8080
+# TLS settings (MODDEX_TLS_*) are managed by install.sh in this file;
+# missing file means plain HTTP.
+EnvironmentFile=-/etc/moddex/moddex.env
 ExecStart=/usr/bin/env java -jar /opt/moddex/app.jar
 Restart=on-failure
 RestartSec=5
 SuccessExitStatus=143 130
+# Let the backend send Minecraft's stop command before signalling any game JVM.
+KillMode=mixed
+TimeoutStopSec=120s
+# A slow world save must not turn into an automatic, potentially destructive kill.
+SendSIGKILL=no
 StandardOutput=append:/var/lib/moddex/logs/backend.out.log
 StandardError=append:/var/lib/moddex/logs/backend.err.log
 

@@ -1,0 +1,224 @@
+<div class="add-mods-page">
+  <div class="add-mods-page__bar">
+    <button mat-button color="primary" (click)="navigateBack()">
+      <mat-icon>arrow_back</mat-icon>
+      {{ 'ADD_MODS.BACK_TO_OVERVIEW' | translate }}
+    </button>
+  </div>
+
+  <section class="controls-header">
+    <div class="controls-header__row">
+      <mat-form-field class="controls-header__search" appearance="outline">
+        <mat-label>{{ 'ADD_MODS.SEARCH_LABEL' | translate }}</mat-label>
+        <input
+          matInput
+          type="search"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="onSearchQueryChange($event)"
+          [placeholder]="'ADD_MODS.SEARCH_PLACEHOLDER' | translate"
+        />
+        <button
+          *ngIf="searchQuery().trim().length"
+          mat-icon-button
+          matSuffix
+          class="controls-header__clear-search"
+          type="button"
+          (click)="clearSearch()"
+          [attr.aria-label]="'ADD_MODS.CLEAR_SEARCH' | translate"
+          matTooltip="{{ 'ADD_MODS.CLEAR_SEARCH' | translate }}"
+        >
+          <mat-icon>close</mat-icon>
+        </button>
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+
+      <div class="controls-header__tools">
+        <button
+          mat-icon-button
+          class="controls-header__icon-button"
+          [class.controls-header__icon-button--active]="sort() !== 'relevance'"
+          [matMenuTriggerFor]="sortMenu"
+          matTooltip="{{ 'ADD_MODS.SORT_TOOLTIP' | translate:{ value: ('ADD_MODS.SORT_' + sort().toUpperCase()) | translate } }}"
+          [attr.aria-label]="'ADD_MODS.SORT_LABEL' | translate"
+        >
+          <mat-icon>sort</mat-icon>
+        </button>
+        <mat-menu #sortMenu="matMenu">
+          <button mat-menu-item (click)="onSortChange('relevance')">{{ 'ADD_MODS.SORT_RELEVANCE' | translate }}</button>
+          <button mat-menu-item (click)="onSortChange('downloads')">{{ 'ADD_MODS.SORT_DOWNLOADS' | translate }}</button>
+          <button mat-menu-item (click)="onSortChange('newest')">{{ 'ADD_MODS.SORT_NEWEST' | translate }}</button>
+        </mat-menu>
+
+        <button
+          mat-icon-button
+          class="controls-header__icon-button"
+          [class.controls-header__icon-button--active]="selectedCategories().length > 0"
+          [matMenuTriggerFor]="categoryMenu"
+          [matBadge]="selectedCategories().length"
+          [matBadgeHidden]="!selectedCategories().length"
+          matBadgeColor="primary"
+          matBadgeSize="small"
+          matBadgeOverlap="false"
+          matTooltip="{{ 'ADD_MODS.FILTER_TOOLTIP' | translate }}"
+          [attr.aria-label]="'ADD_MODS.FILTER_LABEL' | translate"
+        >
+          <mat-icon>tune</mat-icon>
+        </button>
+        <mat-menu #categoryMenu="matMenu" class="category-menu">
+          @if (filters(); as f) {
+            <div class="category-menu__content">
+              @for (category of f.categories; track category.name) {
+                <button mat-menu-item (click)="toggleCategory(category.name)">
+                  <mat-icon>{{ selectedCategories().includes(category.name) ? 'check_box' : 'check_box_outline_blank' }}</mat-icon>
+                  <span>{{ category.name }}</span>
+                </button>
+              }
+            </div>
+          } @else {
+            <div class="category-menu__loading">
+              <mat-progress-spinner diameter="32" mode="indeterminate"></mat-progress-spinner>
+            </div>
+          }
+        </mat-menu>
+
+        <mat-form-field class="controls-header__page-size" appearance="outline">
+          <mat-label>{{ 'ADD_MODS.PAGE_SIZE_LABEL' | translate }}</mat-label>
+          <mat-select [value]="pageSize()" (selectionChange)="onPageSizeChange($event.value)">
+            @for (size of pageSizeOptions; track size) {
+              <mat-option [value]="size">{{ size }}</mat-option>
+            }
+            <mat-option [value]="0">{{ 'ADD_MODS.PAGE_SIZE_ALL' | translate }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+    </div>
+
+    @if (selectedCategories().length || searchQuery().trim() || sort() !== 'relevance') {
+      <div class="controls-header__filters">
+        <mat-chip-set class="active-filters" aria-label="{{ 'ADD_MODS.ACTIVE_FILTERS' | translate }}">
+          @if (searchQuery().trim()) {
+            <mat-chip (removed)="clearSearch()" [removable]="true">
+              {{ 'ADD_MODS.SEARCH_CHIP' | translate:{ term: searchQuery().trim() } }}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+          }
+          @if (sort() !== 'relevance') {
+            <mat-chip (removed)="onSortChange('relevance')" [removable]="true">
+              {{ ('ADD_MODS.SORT_' + sort().toUpperCase()) | translate }}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+          }
+          @for (category of selectedCategories(); track category) {
+            <mat-chip (removed)="toggleCategory(category)" [removable]="true">
+              {{ category }}
+              <mat-icon matChipRemove>cancel</mat-icon>
+            </mat-chip>
+          }
+        </mat-chip-set>
+
+        <button
+          mat-stroked-button
+          class="controls-header__clear"
+          type="button"
+          (click)="clearAllFilters()"
+        >
+          <mat-icon>backspace</mat-icon>
+          {{ 'ADD_MODS.CLEAR_FILTERS' | translate }}
+        </button>
+      </div>
+    }
+  </section>
+
+  @if (errorMessage(); as error) {
+    <div class="error-banner" role="alert">
+      <div class="error-banner__content">
+        <mat-icon>error_outline</mat-icon>
+        <span>{{ error }}</span>
+      </div>
+      <button mat-stroked-button color="warn" (click)="triggerSearch()">
+        {{ 'RETRY' | translate }}
+      </button>
+    </div>
+  }
+
+  <section class="results">
+    <header class="results-header">
+      <div class="results-header__summary">
+        <h2>{{ 'ADD_MODS.RESULTS_TITLE' | translate }}</h2>
+        <p>{{ 'ADD_MODS.RESULTS_SUBTITLE' | translate:{ count: totalMods() } }}</p>
+      </div>
+      @if (isAllMode()) {
+        <span class="results-header__mode">{{ 'ADD_MODS.MODE_ALL' | translate }}</span>
+      }
+    </header>
+
+    <div class="results-insights">
+      <article class="insight-card">
+        <mat-icon>extension</mat-icon>
+        <div class="insight-card__text">
+          <span class="insight-card__label">{{ 'ADD_MODS.INSIGHTS_AVAILABLE' | translate }}</span>
+          <span class="insight-card__value">{{ totalMods() | number }}</span>
+          <span class="insight-card__hint">{{ resultLabel() }}</span>
+        </div>
+      </article>
+
+      <article class="insight-card">
+        <mat-icon>filter_alt</mat-icon>
+        <div class="insight-card__text">
+          <span class="insight-card__label">{{ 'ADD_MODS.INSIGHTS_FILTERS' | translate }}</span>
+          <span class="insight-card__value">{{ activeFiltersCount() }}</span>
+          <span class="insight-card__hint">
+            {{ hasActiveFilters() ? ('ADD_MODS.INSIGHTS_FILTERS_ACTIVE' | translate) : ('ADD_MODS.INSIGHTS_FILTERS_INACTIVE' | translate) }}
+          </span>
+        </div>
+      </article>
+
+      <article class="insight-card">
+        <mat-icon>schedule</mat-icon>
+        <div class="insight-card__text">
+          <span class="insight-card__label">{{ 'ADD_MODS.INSIGHTS_REFRESHED' | translate }}</span>
+          <span class="insight-card__value">
+            @if (lastUpdatedAt(); as refreshed) {
+              {{ refreshed | date:'HH:mm:ss' }}
+            } @else {
+              &mdash;
+            }
+          </span>
+          <span class="insight-card__hint">
+            @if (lastUpdatedAt()) {
+              {{ 'ADD_MODS.LAST_UPDATED_AT' | translate:{ value: (lastUpdatedAt() | date:'medium') } }}
+            } @else {
+              {{ 'ADD_MODS.LAST_UPDATED_NEVER' | translate }}
+            }
+          </span>
+        </div>
+      </article>
+    </div>
+
+    <div class="list-wrapper">
+      <app-mod-list
+        [mods]="mods()"
+        [virtualScroll]="isAllMode()"
+        [totalAvailable]="totalMods()"
+        [loadingMore]="virtualLoading()"
+        [showEmptyState]="!isLoading() && !errorMessage()"
+        [loading]="isLoading() && !hasResults()"
+        [skeletonCount]="pageSize() || 6"
+        (addMod)="onAddMod($event)"
+        (showDetails)="onShowDetails($event)"
+        (loadMore)="loadMoreVirtualMods()"
+      ></app-mod-list>
+
+      <mat-paginator
+        *ngIf="!isAllMode() && totalMods() > pageSize()"
+        class="results-pagination"
+        [length]="totalMods()"
+        [pageSize]="pageSize()"
+        [pageIndex]="page()"
+        [pageSizeOptions]="pageSizeOptions"
+        (page)="onPageChange($event)"
+        aria-label="{{ 'ADD_MODS.PAGINATOR_ARIA' | translate }}"
+      ></mat-paginator>
+    </div>
+  </section>
+</div>

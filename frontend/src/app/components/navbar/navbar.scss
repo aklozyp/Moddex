@@ -1,0 +1,72 @@
+#navbar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: calc(100% - (2 * 8px));
+  height: 4rem;
+  padding: 0 8px;
+  border-radius: 0.6rem;
+  background: var(--surface-2);
+  color: var(--text);
+
+  .nav-items-left {
+    display: flex;
+    align-items: center;
+    margin-right: auto;
+
+    h1 {
+      display: flex;
+      align-items: center;
+      margin: auto;
+      height: 4rem;
+    }
+  }
+
+  .nav-items-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 8px;
+    padding: 0 12px;
+    text-decoration: none;
+    cursor: pointer;
+    color: var(--text);
+
+    &:hover {
+      background: var(--surface);
+    }
+  }
+
+  .create-modpack-btn {
+    border-radius: 999px; // Pill shape
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+
+  .settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    border-radius: 50%;
+    cursor: pointer;
+    color: var(--text);
+
+    &:hover {
+      background: var(--surface);
+    }
+  }
+}

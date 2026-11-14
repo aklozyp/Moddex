@@ -1,0 +1,38 @@
+<div class="auth-container">
+  <mat-card class="auth-card">
+    <mat-card-header>
+      <mat-card-title>{{ 'SETUP.TITLE' | translate }}</mat-card-title>
+      <mat-card-subtitle>{{ 'SETUP.SUBTITLE' | translate }}</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+       <p>{{ 'SETUP.DESCRIPTION' | translate }}</p>
+       
+       <form (submit)="completeSetup()">
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ 'SETUP.BOOTSTRAP_TOKEN_LABEL' | translate }}</mat-label>
+          <input matInput type="text" [(ngModel)]="bootstrapToken" name="bootstrapToken" required autocomplete="off" spellcheck="false">
+          <mat-hint>{{ 'SETUP.BOOTSTRAP_TOKEN_HINT' | translate }}</mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ 'SETUP.PASSWORD_LABEL' | translate }}</mat-label>
+          <input matInput type="password" [(ngModel)]="password" name="password" required>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>{{ 'SETUP.CONFIRM_PASSWORD_LABEL' | translate }}</mat-label>
+          <input matInput type="password" [(ngModel)]="confirmPassword" name="confirmPassword" required>
+        </mat-form-field>
+        
+        @if (error(); as setupError) {
+          <div class="error" role="alert">{{ setupError.key | translate: setupError.params }}</div>
+        }
+      </form>
+    </mat-card-content>
+    <mat-card-actions>
+      <button mat-flat-button color="primary" class="full-width" (click)="completeSetup()" [disabled]="isLoading() || !password || !bootstrapToken.trim()">
+        {{ 'SETUP.COMPLETE_BUTTON' | translate }}
+      </button>
+    </mat-card-actions>
+  </mat-card>
+</div>

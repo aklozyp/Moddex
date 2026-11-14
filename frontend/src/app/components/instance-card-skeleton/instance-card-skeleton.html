@@ -1,0 +1,29 @@
+<div class="card">
+  <div id="instance-image" class="card__aside">
+    <div class="skeleton-box"></div>
+  </div>
+
+  <div class="card__header">
+    <div class="skeleton-text skeleton-title" [style.width.%]="titleWidth"></div>
+  </div>
+
+  <div class="card__body">
+    <div *ngFor="let width of bodyLineWidths"
+         class="skeleton-text"
+         [style.width.%]="width"></div>
+  </div>
+
+  <div id="instance-infos" class="card__footer">
+    <div id="instance-categories">
+      <div *ngFor="let width of categoryWidths"
+           class="skeleton-text skeleton-text-xs"
+           [style.width.px]="width"></div>
+    </div>
+
+    <div id="instance-stats">
+      <div *ngFor="let _ of stats"
+           class="skeleton-text skeleton-text-xs"></div>
+    </div>
+  </div>
+
+</div>

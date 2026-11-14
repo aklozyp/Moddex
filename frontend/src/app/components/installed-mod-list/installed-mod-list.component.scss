@@ -1,0 +1,201 @@
+.installed-mod-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  width: 100%;
+}
+
+.mod-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  cursor: pointer;
+  padding: 1.35rem 1.5rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: linear-gradient(135deg,
+      color-mix(in srgb, var(--surface) 94%, transparent) 0%,
+      color-mix(in srgb, var(--surface-2) 94%, transparent) 100%);
+  transition: transform 0.18s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: none;
+  width: 100%;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--primary) 38%, var(--border));
+    box-shadow: var(--shadow);
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  &__title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: 0.92rem;
+    color: color-mix(in srgb, var(--muted) 90%, transparent);
+  }
+
+  &__badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    margin-top: 0.35rem;
+  }
+
+  &__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.22rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+    color: color-mix(in srgb, var(--muted) 85%, transparent);
+    border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+
+    &[data-provider='CURSEFORGE'] {
+      background: #f16436;
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    &[data-provider='MODRINTH'] {
+      background: #00af5c;
+      color: #ffffff;
+      border-color: transparent;
+    }
+
+    &--client {
+      background: color-mix(in srgb, var(--accent) 28%, transparent);
+      color: color-mix(in srgb, var(--accent) 72%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+    }
+
+    &--pending {
+      background: color-mix(in srgb, #fbc02d 20%, transparent);
+      color: #8c6d00;
+      border: 1px solid rgba(255, 193, 7, 0.45);
+    }
+  }
+
+  &__version {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  &__meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    font-size: 0.9rem;
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: color-mix(in srgb, var(--muted) 85%, transparent);
+    }
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+
+    button[mat-stroked-button] {
+      border-radius: 999px;
+      padding: 0.45rem 1.2rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    button[mat-icon-button] {
+      border-radius: 0.85rem;
+      background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+      transition: background 0.2s ease;
+    }
+
+    button[mat-icon-button]:hover {
+      background: color-mix(in srgb, var(--surface-2) 86%, transparent);
+    }
+  }
+}
+
+mat-divider {
+  border-top-width: 1px;
+  border-color: color-mix(in srgb, var(--border) 80%, transparent) !important;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  padding: 3rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 0.85rem;
+  color: var(--muted);
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 0.5rem;
+  }
+}
+
+mat-chip {
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.mod-card__download {
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--surface-2) 74%, transparent);
+  transition: background 0.2s ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--surface-2) 90%, transparent);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+@media (max-width: 720px) {
+  .mod-card {
+    padding: 1.1rem;
+  }
+
+  .mod-card__header {
+    flex-direction: column;
+  }
+
+  .mod-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

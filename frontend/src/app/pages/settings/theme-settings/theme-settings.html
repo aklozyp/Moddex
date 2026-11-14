@@ -1,0 +1,18 @@
+<div class="theme-settings">
+  <h2>{{ 'THEME' | translate }}</h2>
+  <div class="theme-selection-list">
+    @for (theme of themes; track theme) {
+      <div class="theme-option" [class.active]="settingsService.draftSettings$()?.webTheme === theme" (click)="setTheme(theme)">
+        <span class="theme-name">{{ themeLabels[theme] | translate }}</span>
+        <div class="theme-preview">
+          <div class="preview-swatches" [attr.data-theme]="theme">
+            <span class="preview-swatch bg"></span>
+            <span class="preview-swatch surface"></span>
+            <span class="preview-swatch primary"></span>
+            <span class="preview-swatch accent"></span>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

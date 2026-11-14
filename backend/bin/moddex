@@ -1,0 +1,327 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Moddex command line helper
+# Lightweight helper for common Moddex host tasks.
+#
+# The backend URL is derived from the native TLS configuration that install.sh
+# manages in the systemd environment file: HTTPS is used when
+# MODDEX_TLS_ENABLED="true" is stored there, plain HTTP otherwise. HTTPS
+# requests are always verified against the deployed certificate chain or an
+# explicitly configured CA; verification is never disabled and there is no
+# insecure fallback.
+
+ENV_FILE="${MODDEX_ENV_FILE:-/etc/moddex/moddex.env}"
+UNIT_FILE="${MODDEX_UNIT_FILE:-/etc/systemd/system/moddex-backend.service}"
+CLI_HOST="${MODDEX_CLI_HOST:-127.0.0.1}"
+CLI_PORT="${MODDEX_CLI_PORT:-}"
+CLI_CA_FILE="${MODDEX_CLI_CA_FILE:-}"
+
+BASE_URL=""
+TLS_ARGS=()
+PASSWORD_VALUE=""
+
+usage() {
+  cat <<'MSG'
+Moddex CLI
+==========
+
+Small helper for common Moddex host tasks. The backend URL is derived from
+the native TLS configuration managed by install.sh: HTTPS is used when
+MODDEX_TLS_ENABLED="true" is stored in the systemd environment file
+(/etc/moddex/moddex.env), plain HTTP otherwise. The port comes from
+SERVER_PORT in the systemd unit (default 8080). TLS connections are always
+verified; verification is never disabled.
+
+Commands:
+  status    Show the backend service state and API reachability
+  login     Verify the administrator password with one authenticated API call
+  version   Print the installed version from /opt/moddex/VERSION
+
+Overrides:
+  MODDEX_ENV_FILE     TLS environment file (default /etc/moddex/moddex.env)
+  MODDEX_UNIT_FILE    systemd unit file (default /etc/systemd/system/
+                      moddex-backend.service)
+  MODDEX_CLI_HOST     backend host (default 127.0.0.1; set the server host
+                      name if the certificate was issued for it)
+  MODDEX_CLI_PORT     backend port (default: SERVER_PORT from the unit)
+  MODDEX_CLI_CA_FILE  CA certificate for TLS verification (default: the
+                      certificate chain configured as MODDEX_TLS_CERT_FILE)
+
+The login command reads the administrator password from
+MODDEX_ADMIN_PASSWORD or from an interactive prompt. The password is never
+passed as a command argument, never printed, and never stored. Reading the
+TLS configuration requires permission to read the environment file, which
+install.sh creates with mode 0600 (for example run via sudo otherwise).
+MSG
+}
+
+die() {
+  printf 'moddex: %s\n' "$*" >&2
+  exit 1
+}
+
+usage_error() {
+  printf 'moddex: %s\n' "$*" >&2
+  printf "Run 'moddex help' for usage.\n" >&2
+  exit 2
+}
+
+# Extracts one value from the systemd environment file. Only the requested
+# key is read; other lines (including the keystore password) are never
+# echoed or passed on.
+env_file_value() {
+  local key="$1" value=""
+  value="$(sed -nE "s/^${key}=\"([^\"]*)\"[[:space:]]*\$/\1/p" "$ENV_FILE")"
+  value="${value%%$'\n'*}"
+  if [[ -z "$value" ]]; then
+    value="$(sed -nE "s/^${key}=([^\"#[:space:]]*)[[:space:]]*\$/\1/p" "$ENV_FILE")"
+    value="${value%%$'\n'*}"
+  fi
+  printf '%s' "$value"
+}
+
+# Builds the backend URL and curl TLS arguments from the deployed
+# configuration. TLS stays off unless MODDEX_TLS_ENABLED is true; an invalid
+# value fails with the same contract the backend applies at startup.
+resolve_url_and_tls() {
+  local port="" enabled_value="" cert_value="" enabled="false"
+
+  if [[ -z "$CLI_HOST" || "$CLI_HOST" == *[[:space:]]* || "$CLI_HOST" == */* ]]; then
+    die "MODDEX_CLI_HOST must be a host name or IP address without whitespace or slashes. Set a valid host or unset the variable to use 127.0.0.1, then retry."
+  fi
+
+  if [[ -n "$CLI_PORT" ]]; then
+    port="$CLI_PORT"
+  elif [[ -e "$UNIT_FILE" ]]; then
+    if [[ ! -r "$UNIT_FILE" || ! -f "$UNIT_FILE" ]]; then
+      die "The systemd unit $UNIT_FILE exists but is not readable by this user. Fix the permissions or set MODDEX_CLI_PORT explicitly, then retry."
+    fi
+    port="$(sed -nE 's/^Environment=SERVER_PORT=([0-9]+)[[:space:]]*$/\1/p' "$UNIT_FILE")"
+    port="${port%%$'\n'*}"
+  fi
+  if [[ -z "$port" ]]; then
+    port="8080"
+  fi
+  if [[ ! "$port" =~ ^[0-9]+$ ]] || (( 10#$port < 1 || 10#$port > 65535 )); then
+    die "The backend port '$port' is not a valid port between 1 and 65535. Fix SERVER_PORT in $UNIT_FILE or set MODDEX_CLI_PORT explicitly, then retry."
+  fi
+
+  if [[ -e "$ENV_FILE" ]]; then
+    if [[ ! -r "$ENV_FILE" || ! -f "$ENV_FILE" ]]; then
+      die "The Moddex TLS configuration $ENV_FILE exists but is not readable by this user. Rerun with sufficient privileges (for example via sudo) or fix the permissions, then retry. The URL scheme is never guessed silently."
+    fi
+    enabled_value="$(env_file_value MODDEX_TLS_ENABLED)"
+    if [[ -n "$enabled_value" ]]; then
+      case "$enabled_value" in
+        [Tt][Rr][Uu][Ee]) enabled="true" ;;
+        [Ff][Aa][Ll][Ss][Ee]) enabled="false" ;;
+        *) die "MODDEX_TLS_ENABLED in $ENV_FILE must be true or false. Fix the value exactly as install.sh writes it, then retry." ;;
+      esac
+    fi
+  fi
+
+  if [[ "$enabled" == "true" ]]; then
+    BASE_URL="https://$CLI_HOST:$port"
+    cert_value="$(env_file_value MODDEX_TLS_CERT_FILE)"
+    resolve_tls_arguments "$cert_value"
+  else
+    BASE_URL="http://$CLI_HOST:$port"
+    TLS_ARGS=()
+  fi
+}
+
+# Chooses the CA material for verification: an explicit override wins, then
+# the certificate chain deployed by install.sh, otherwise the system trust
+# store (keystore variant). A missing or unreadable CA file fails with a safe
+# next action instead of an insecure fallback.
+resolve_tls_arguments() {
+  local cert_value="$1" ca_file=""
+  if [[ -n "$CLI_CA_FILE" ]]; then
+    ca_file="$CLI_CA_FILE"
+    if [[ ! -r "$ca_file" || ! -f "$ca_file" ]]; then
+      die "MODDEX_CLI_CA_FILE points to '$ca_file', which is not a readable file. Set it to a readable PEM CA certificate, or unset it to use the certificate chain from $ENV_FILE, then retry. TLS verification is never disabled."
+    fi
+  elif [[ -n "$cert_value" ]]; then
+    ca_file="$cert_value"
+    if [[ ! -r "$ca_file" || ! -f "$ca_file" ]]; then
+      die "Native TLS is enabled but MODDEX_TLS_CERT_FILE points to '$ca_file', which is not a readable file. Fix the certificate chain path in $ENV_FILE (reinstall with install.sh --tls-cert/--tls-key if needed), then retry. TLS verification is never disabled."
+    fi
+  fi
+  if [[ -n "$ca_file" ]]; then
+    TLS_ARGS=(--cacert "$ca_file")
+  else
+    # Keystore variant without an explicit CA: verify against the system
+    # trust store; a verification failure is reported with a safe next action.
+    TLS_ARGS=()
+  fi
+}
+
+# Maps curl transport and TLS failures to safe messages with a next action.
+# curl runs with --silent, so raw error output is never shown and no secret
+# is ever included; the exit code carries the diagnosis.
+report_transport_failure() {
+  local rc="$1"
+  case "$rc" in
+    7) die "The backend API is not reachable at $BASE_URL. Check that the moddex-backend service is running and that the configured port matches the deployed port, then retry." ;;
+    28) die "The backend API at $BASE_URL did not respond within 10 seconds. Check the service state and system load, then retry." ;;
+    35) die "The TLS handshake with $BASE_URL failed. The backend may serve plain HTTP on this port or use a different TLS setup. Verify the native TLS configuration in $ENV_FILE and the configured port, then retry." ;;
+    60) die "TLS verification of the backend at $BASE_URL failed: the server certificate is not valid or is not issued by a trusted CA. Check the certificate chain configured as MODDEX_TLS_CERT_FILE in $ENV_FILE, or set MODDEX_CLI_CA_FILE to the issuing CA certificate, then retry. TLS verification is never disabled." ;;
+    77) die "TLS verification of the backend at $BASE_URL failed: the configured CA certificate file could not be read. Fix the CA file (MODDEX_CLI_CA_FILE or MODDEX_TLS_CERT_FILE in $ENV_FILE), then retry." ;;
+    22) die "The backend API at $BASE_URL answered with an HTTP error. Check the backend logs of moddex-backend.service, then retry." ;;
+    *) die "The request to $BASE_URL failed (curl exit $rc). Check connectivity and the backend logs, then retry." ;;
+  esac
+}
+
+# Runs curl against the backend with the resolved TLS arguments applied.
+backend_curl() {
+  if [[ "${#TLS_ARGS[@]}" -gt 0 ]]; then
+    curl "${TLS_ARGS[@]}" "$@"
+  else
+    curl "$@"
+  fi
+}
+
+api_get() {
+  local path="$1" rc=0 body
+  body="$(backend_curl --silent --fail --max-time 10 "$BASE_URL$path")" || rc=$?
+  if [[ "$rc" -ne 0 ]]; then
+    report_transport_failure "$rc"
+  fi
+  printf '%s' "$body"
+}
+
+# Reads the administrator password into PASSWORD_VALUE. The password is taken
+# from the environment or an interactive prompt, never from command
+# arguments, and is removed from the environment immediately after reading.
+obtain_password() {
+  if [[ -n "${MODDEX_ADMIN_PASSWORD:-}" ]]; then
+    PASSWORD_VALUE="$MODDEX_ADMIN_PASSWORD"
+    unset MODDEX_ADMIN_PASSWORD
+  elif [[ -t 0 ]]; then
+    printf 'Administrator password: ' >&2
+    local entered=""
+    if ! read -r -s entered; then
+      printf '\n' >&2
+      die "No administrator password could be read from the terminal. Set MODDEX_ADMIN_PASSWORD or rerun this command in an interactive terminal, then retry."
+    fi
+    printf '\n' >&2
+    PASSWORD_VALUE="$entered"
+  else
+    die "No administrator password available. Set MODDEX_ADMIN_PASSWORD or run this command in an interactive terminal, then retry."
+  fi
+  if [[ -z "$PASSWORD_VALUE" ]]; then
+    die "The administrator password is empty. Set MODDEX_ADMIN_PASSWORD to the configured administrator password, then retry."
+  fi
+  if [[ "$PASSWORD_VALUE" =~ [[:cntrl:]] ]]; then
+    die "The administrator password contains control characters, which cannot be transmitted safely. Use a password without control characters, then retry."
+  fi
+}
+
+json_quote_value() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  printf '%s' "$value"
+}
+
+cmd_status() {
+  resolve_url_and_tls
+  printf 'Backend URL: %s\n' "$BASE_URL"
+  local state=""
+  if command -v systemctl >/dev/null 2>&1; then
+    state="$(systemctl is-active moddex-backend 2>/dev/null || true)"
+  fi
+  if [[ -n "$state" ]]; then
+    printf 'Backend service (moddex-backend.service): %s\n' "$state"
+  else
+    printf 'Backend service (moddex-backend.service): unknown (systemctl unavailable or failed)\n'
+  fi
+  local body setup_state
+  body="$(api_get "/api/v1/setup/status")"
+  setup_state="$(printf '%s' "$body" | sed -nE 's/.*"setupRequired"[[:space:]]*:[[:space:]]*(true|false).*/\1/p')"
+  setup_state="${setup_state%%$'\n'*}"
+  printf 'Backend API: reachable'
+  case "$setup_state" in
+    true) printf ' (setup required)' ;;
+    false) printf ' (setup not required)' ;;
+  esac
+  printf '\n'
+}
+
+cmd_login() {
+  resolve_url_and_tls
+  obtain_password
+  local payload rc=0 response http_code token
+  payload="$(printf '{"password":"%s"}' "$(json_quote_value "$PASSWORD_VALUE")")"
+  response="$(printf '%s' "$payload" |
+    backend_curl --silent --max-time 10 \
+      --header 'Content-Type: application/json' --data-binary @- \
+      --write-out '\n%{http_code}' "$BASE_URL/api/v1/auth/login")" || rc=$?
+  unset PASSWORD_VALUE payload
+  if [[ "$rc" -ne 0 ]]; then
+    report_transport_failure "$rc"
+  fi
+  http_code="${response##*$'\n'}"
+  response="${response%$'\n'*}"
+  case "$http_code" in
+    200) ;;
+    401) die "Authentication failed: the backend rejected the administrator password. Check the password and retry." ;;
+    403) die "The backend requires the initial administrator setup before sign-in. Complete the setup as documented in docs/backend-setup.md, then retry." ;;
+    *) die "The backend at $BASE_URL answered sign-in with unexpected HTTP status ${http_code:-unknown}. Check the backend logs, then retry." ;;
+  esac
+  token="$(printf '%s' "$response" | sed -nE 's/.*"token"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p')"
+  token="${token%%$'\n'*}"
+  if [[ ! "$token" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    die "The backend returned an unexpected sign-in response. Verify the backend version and logs, then retry."
+  fi
+  # The token is passed to curl through the configuration on stdin so it
+  # never appears in process arguments, and it is never printed or stored.
+  rc=0
+  printf 'header = "Authorization: Bearer %s"\n' "$token" |
+    backend_curl --silent --fail --max-time 10 --config - \
+      "$BASE_URL/api/v1/instance" || rc=$?
+  unset token
+  if [[ "$rc" -ne 0 ]]; then
+    report_transport_failure "$rc"
+  fi
+  printf 'Authentication successful (authenticated API request to %s/api/v1/instance succeeded).\n' "$BASE_URL"
+}
+
+cmd_version() {
+  local installed_version
+  if ! installed_version="$(cat /opt/moddex/VERSION 2>/dev/null)" ||
+    [[ ! "$installed_version" =~ ^[A-Za-z0-9._-]+$ || "$installed_version" == latest ]]; then
+    echo "Installed version unavailable or invalid in /opt/moddex/VERSION. Reinstall a complete Moddex bundle." >&2
+    exit 1
+  fi
+  printf '%s\n' "$installed_version"
+}
+
+main() {
+  case "${1:-}" in
+    ""|"help"|"-h"|"--help")
+      usage
+      ;;
+    status)
+      shift
+      [[ $# -eq 0 ]] || usage_error "status takes no additional arguments."
+      cmd_status
+      ;;
+    login)
+      shift
+      [[ $# -eq 0 ]] || usage_error "login takes no additional arguments. Set MODDEX_ADMIN_PASSWORD or use the interactive prompt."
+      cmd_login
+      ;;
+    version)
+      shift
+      [[ $# -eq 0 ]] || usage_error "version takes no additional arguments."
+      cmd_version
+      ;;
+    *)
+      usage_error "Unknown command: ${1:-}"
+      ;;
+  esac
+}
+
+main "$@"

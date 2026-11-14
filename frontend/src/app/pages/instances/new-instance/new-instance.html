@@ -1,0 +1,73 @@
+<form [formGroup]="form" class="general-form">
+  <h2>{{ 'NEW_INSTANCE.GENERAL' | translate }}</h2>
+
+  <mat-form-field>
+    <mat-label>{{ 'NEW_INSTANCE.PROJECT_NAME' | translate }}</mat-label>
+    <input matInput formControlName="name">
+    <mat-error>{{ 'NEW_INSTANCE.PROJECT_NAME_REQUIRED' | translate }}</mat-error>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>{{ 'NEW_INSTANCE.PROJECT_DESCRIPTION' | translate }}</mat-label>
+    <textarea matInput formControlName="description"></textarea>
+  </mat-form-field>
+
+  <div class="version-selection">
+    <mat-form-field class="version-dropdown">
+      <mat-label>{{ 'NEW_INSTANCE.MINECRAFT_VERSION' | translate }}</mat-label>
+      <mat-select formControlName="minecraftVersion">
+        @for (group of groupedMinecraftVersions(); track group[0]) {
+          <mat-optgroup [label]="group[0]">
+            @for (version of group[1]; track version) {
+              <mat-option [value]="version">{{ version }}</mat-option>
+            }
+          </mat-optgroup>
+        }
+      </mat-select>
+      <mat-error>{{ 'NEW_INSTANCE.MINECRAFT_VERSION_REQUIRED' | translate }}</mat-error>
+    </mat-form-field>
+    <mat-checkbox formControlName="showOnlyReleases">{{ 'NEW_INSTANCE.SHOW_ONLY_RELEASES' | translate }}</mat-checkbox>
+  </div>
+
+  @if (minecraftVersion()) {
+    <mat-form-field>
+      <mat-label>{{ 'NEW_INSTANCE.MOD_LOADER' | translate }}</mat-label>
+      <mat-select formControlName="modLoader">
+        @for (loader of modLoaders(); track loader) {
+          <mat-option [value]="loader">{{ loader }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    @if (loadersFailed()) {
+      <p class="loaders-error" role="alert">{{ 'NEW_INSTANCE.LOADERS_LOAD_ERROR' | translate }}</p>
+    }
+  }
+
+  @if (modLoader() && modLoader() !== 'Vanilla' && loaderVersions()) {
+    <mat-form-field>
+      <mat-label>{{ 'NEW_INSTANCE.LOADER_VERSION' | translate }}</mat-label>
+      <mat-select formControlName="loaderVersion">
+        @for (version of loaderVersions(); track version) {
+          <mat-option [value]="version">{{ version }}</mat-option>
+        }
+      </mat-select>
+      <mat-error>{{ 'NEW_INSTANCE.LOADER_VERSION_REQUIRED' | translate }}</mat-error>
+    </mat-form-field>
+  }
+
+  <div class="actions">
+    <app-button
+      [text]="'NEW_INSTANCE.CREATE_PROJECT' | translate"
+      styleType="primary"
+      [disabled]="!canSubmit()"
+      (click)="createProject()"
+    ></app-button>
+
+    @if (statusMessage()) {
+      <span class="status" [class.success]="statusType() === 'success'" [class.error]="statusType() === 'error'">
+        {{ statusMessage() | translate }}
+      </span>
+    }
+  </div>
+</form>
+

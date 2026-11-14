@@ -1,0 +1,35 @@
+<div class="mod-result-card mod-result-card--skeleton">
+  <div class="mod-result-card__media">
+    <span class="skeleton skeleton--thumbnail"></span>
+  </div>
+  <div class="mod-result-card__content">
+    <div class="mod-result-card__header">
+      <div class="mod-result-card__titles">
+        <span class="skeleton skeleton--title" [style.width.%]="titleWidth"></span>
+        <span class="skeleton skeleton--subtitle" [style.width.%]="subtitleWidth"></span>
+      </div>
+      <span class="skeleton skeleton--button" [style.width.px]="buttonWidth"></span>
+    </div>
+
+    <div class="mod-result-card__badges" aria-hidden="true">
+      @for (width of badgeWidths; track $index) {
+        <span class="skeleton skeleton--badge" [style.width.px]="width"></span>
+      }
+    </div>
+
+    <div class="mod-result-card__description" aria-hidden="true">
+      @for (width of descriptionWidths; track $index) {
+        <span class="skeleton skeleton--line" [style.width.%]="width"></span>
+      }
+    </div>
+
+    <div class="mod-result-card__meta" aria-hidden="true">
+      <div class="mod-result-card__stats">
+        @for (width of statWidths; track $index) {
+          <span class="skeleton skeleton--stat" [style.width.px]="width"></span>
+        }
+      </div>
+      <span class="skeleton skeleton--chip" [style.width.px]="chipWidth"></span>
+    </div>
+  </div>
+</div>

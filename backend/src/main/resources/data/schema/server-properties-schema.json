@@ -1,0 +1,562 @@
+﻿{
+  "categoryOrder": [
+    "general",
+    "gameplay",
+    "world",
+    "performance",
+    "network",
+    "security",
+    "extras"
+  ],
+  "categories": {
+    "general": { "labelKey": "SERVER_PROPERTIES.CATEGORY.GENERAL" },
+    "gameplay": { "labelKey": "SERVER_PROPERTIES.CATEGORY.GAMEPLAY" },
+    "world": { "labelKey": "SERVER_PROPERTIES.CATEGORY.WORLD" },
+    "performance": { "labelKey": "SERVER_PROPERTIES.CATEGORY.PERFORMANCE" },
+    "network": { "labelKey": "SERVER_PROPERTIES.CATEGORY.NETWORK" },
+    "security": { "labelKey": "SERVER_PROPERTIES.CATEGORY.SECURITY" },
+    "extras": { "labelKey": "SERVER_PROPERTIES.CATEGORY.EXTRAS" }
+  },
+  "properties": [
+    {
+      "key": "enable-jmx-monitoring",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "performance",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ENABLE_JMX_MONITORING",
+      "helpKey": "SERVER_PROPERTIES.HELP.ENABLE_JMX_MONITORING",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "rcon.port",
+      "type": "INTEGER",
+      "defaultValue": "25575",
+      "min": 1,
+      "max": 65535,
+      "category": "network",
+      "labelKey": "SERVER_PROPERTIES.LABEL.RCON_PORT",
+      "helpKey": "SERVER_PROPERTIES.HELP.RCON_PORT",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "level-seed",
+      "type": "STRING",
+      "defaultValue": "",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.LEVEL_SEED",
+      "helpKey": "SERVER_PROPERTIES.HELP.LEVEL_SEED",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "gamemode",
+      "type": "ENUM",
+      "defaultValue": "survival",
+      "enumValues": ["survival", "creative", "adventure", "spectator"],
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.GAMEMODE",
+      "helpKey": "SERVER_PROPERTIES.HELP.GAMEMODE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "enable-command-block",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ENABLE_COMMAND_BLOCK",
+      "helpKey": "SERVER_PROPERTIES.HELP.ENABLE_COMMAND_BLOCK",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "enable-query",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "network",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ENABLE_QUERY",
+      "helpKey": "SERVER_PROPERTIES.HELP.ENABLE_QUERY",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "generator-settings",
+      "type": "STRING",
+      "defaultValue": "{}",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.GENERATOR_SETTINGS",
+      "helpKey": "SERVER_PROPERTIES.HELP.GENERATOR_SETTINGS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "enforce-secure-profile",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ENFORCE_SECURE_PROFILE",
+      "helpKey": "SERVER_PROPERTIES.HELP.ENFORCE_SECURE_PROFILE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "level-name",
+      "type": "STRING",
+      "defaultValue": "world",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.LEVEL_NAME",
+      "helpKey": "SERVER_PROPERTIES.HELP.LEVEL_NAME",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "motd",
+      "type": "STRING",
+      "defaultValue": "A Minecraft Server",
+      "category": "general",
+      "labelKey": "SERVER_PROPERTIES.LABEL.MOTD",
+      "helpKey": "SERVER_PROPERTIES.HELP.MOTD",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "query.port",
+      "type": "INTEGER",
+      "defaultValue": "25565",
+      "min": 1,
+      "max": 65535,
+      "category": "network",
+      "labelKey": "SERVER_PROPERTIES.LABEL.QUERY_PORT",
+      "helpKey": "SERVER_PROPERTIES.HELP.QUERY_PORT",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "pvp",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.PVP",
+      "helpKey": "SERVER_PROPERTIES.HELP.PVP",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "generate-structures",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.GENERATE_STRUCTURES",
+      "helpKey": "SERVER_PROPERTIES.HELP.GENERATE_STRUCTURES",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "max-chained-neighbor-updates",
+      "type": "INTEGER",
+      "defaultValue": "1000000",
+      "min": 0,
+      "category": "performance",
+      "labelKey": "SERVER_PROPERTIES.LABEL.MAX_CHAINED_NEIGHBOR_UPDATES",
+      "helpKey": "SERVER_PROPERTIES.HELP.MAX_CHAINED_NEIGHBOR_UPDATES",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "difficulty",
+      "type": "ENUM",
+      "defaultValue": "easy",
+      "enumValues": ["peaceful", "easy", "normal", "hard"],
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.DIFFICULTY",
+      "helpKey": "SERVER_PROPERTIES.HELP.DIFFICULTY",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "network-compression-threshold",
+      "type": "INTEGER",
+      "defaultValue": "256",
+      "min": -1,
+      "category": "network",
+      "labelKey": "SERVER_PROPERTIES.LABEL.NETWORK_COMPRESSION_THRESHOLD",
+      "helpKey": "SERVER_PROPERTIES.HELP.NETWORK_COMPRESSION_THRESHOLD",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "max-tick-time",
+      "type": "INTEGER",
+      "defaultValue": "60000",
+      "min": -1,
+      "category": "performance",
+      "labelKey": "SERVER_PROPERTIES.LABEL.MAX_TICK_TIME",
+      "helpKey": "SERVER_PROPERTIES.HELP.MAX_TICK_TIME",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "require-resource-pack",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "general",
+      "labelKey": "SERVER_PROPERTIES.LABEL.REQUIRE_RESOURCE_PACK",
+      "helpKey": "SERVER_PROPERTIES.HELP.REQUIRE_RESOURCE_PACK",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "use-native-transport",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "performance",
+      "labelKey": "SERVER_PROPERTIES.LABEL.USE_NATIVE_TRANSPORT",
+      "helpKey": "SERVER_PROPERTIES.HELP.USE_NATIVE_TRANSPORT",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "max-players",
+      "type": "INTEGER",
+      "defaultValue": "20",
+      "min": 1,
+      "category": "general",
+      "labelKey": "SERVER_PROPERTIES.LABEL.MAX_PLAYERS",
+      "helpKey": "SERVER_PROPERTIES.HELP.MAX_PLAYERS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "online-mode",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ONLINE_MODE",
+      "helpKey": "SERVER_PROPERTIES.HELP.ONLINE_MODE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "enable-status",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "network",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ENABLE_STATUS",
+      "helpKey": "SERVER_PROPERTIES.HELP.ENABLE_STATUS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "allow-flight",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ALLOW_FLIGHT",
+      "helpKey": "SERVER_PROPERTIES.HELP.ALLOW_FLIGHT",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "initial-disabled-packs",
+      "type": "STRING",
+      "defaultValue": "",
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.INITIAL_DISABLED_PACKS",
+      "helpKey": "SERVER_PROPERTIES.HELP.INITIAL_DISABLED_PACKS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "broadcast-rcon-to-ops",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.BROADCAST_RCON_TO_OPS",
+      "helpKey": "SERVER_PROPERTIES.HELP.BROADCAST_RCON_TO_OPS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "view-distance",
+      "type": "INTEGER",
+      "defaultValue": "10",
+      "min": 2,
+      "max": 32,
+      "category": "performance",
+      "labelKey": "SERVER_PROPERTIES.LABEL.VIEW_DISTANCE",
+      "helpKey": "SERVER_PROPERTIES.HELP.VIEW_DISTANCE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "server-ip",
+      "type": "STRING",
+      "defaultValue": "",
+      "category": "network",
+      "labelKey": "SERVER_PROPERTIES.LABEL.SERVER_IP",
+      "helpKey": "SERVER_PROPERTIES.HELP.SERVER_IP",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "resource-pack-prompt",
+      "type": "STRING",
+      "defaultValue": "",
+      "category": "general",
+      "labelKey": "SERVER_PROPERTIES.LABEL.RESOURCE_PACK_PROMPT",
+      "helpKey": "SERVER_PROPERTIES.HELP.RESOURCE_PACK_PROMPT",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "allow-nether",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ALLOW_NETHER",
+      "helpKey": "SERVER_PROPERTIES.HELP.ALLOW_NETHER",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "server-port",
+      "type": "INTEGER",
+      "defaultValue": "25565",
+      "min": 1,
+      "max": 65535,
+      "category": "network",
+      "labelKey": "SERVER_PROPERTIES.LABEL.SERVER_PORT",
+      "helpKey": "SERVER_PROPERTIES.HELP.SERVER_PORT",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "enable-rcon",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ENABLE_RCON",
+      "helpKey": "SERVER_PROPERTIES.HELP.ENABLE_RCON",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "sync-chunk-writes",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "performance",
+      "labelKey": "SERVER_PROPERTIES.LABEL.SYNC_CHUNK_WRITES",
+      "helpKey": "SERVER_PROPERTIES.HELP.SYNC_CHUNK_WRITES",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "op-permission-level",
+      "type": "INTEGER",
+      "defaultValue": "4",
+      "min": 1,
+      "max": 4,
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.OP_PERMISSION_LEVEL",
+      "helpKey": "SERVER_PROPERTIES.HELP.OP_PERMISSION_LEVEL",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "prevent-proxy-connections",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.PREVENT_PROXY_CONNECTIONS",
+      "helpKey": "SERVER_PROPERTIES.HELP.PREVENT_PROXY_CONNECTIONS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "hide-online-players",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.HIDE_ONLINE_PLAYERS",
+      "helpKey": "SERVER_PROPERTIES.HELP.HIDE_ONLINE_PLAYERS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "resource-pack",
+      "type": "STRING",
+      "defaultValue": "",
+      "category": "general",
+      "labelKey": "SERVER_PROPERTIES.LABEL.RESOURCE_PACK_URI",
+      "helpKey": "SERVER_PROPERTIES.HELP.RESOURCE_PACK_URI",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "entity-broadcast-range-percentage",
+      "type": "INTEGER",
+      "defaultValue": "100",
+      "min": 50,
+      "max": 500,
+      "category": "performance",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ENTITY_BROADCAST_RANGE_PERCENTAGE",
+      "helpKey": "SERVER_PROPERTIES.HELP.ENTITY_BROADCAST_RANGE_PERCENTAGE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "simulation-distance",
+      "type": "INTEGER",
+      "defaultValue": "10",
+      "min": 2,
+      "max": 32,
+      "category": "performance",
+      "labelKey": "SERVER_PROPERTIES.LABEL.SIMULATION_DISTANCE",
+      "helpKey": "SERVER_PROPERTIES.HELP.SIMULATION_DISTANCE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "rcon.password",
+      "type": "STRING",
+      "defaultValue": "",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.RCON_PASSWORD",
+      "helpKey": "SERVER_PROPERTIES.HELP.RCON_PASSWORD",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "player-idle-timeout",
+      "type": "INTEGER",
+      "defaultValue": "0",
+      "min": 0,
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.PLAYER_IDLE_TIMEOUT",
+      "helpKey": "SERVER_PROPERTIES.HELP.PLAYER_IDLE_TIMEOUT",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "force-gamemode",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.FORCE_GAMEMODE",
+      "helpKey": "SERVER_PROPERTIES.HELP.FORCE_GAMEMODE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "rate-limit",
+      "type": "INTEGER",
+      "defaultValue": "0",
+      "min": 0,
+      "category": "network",
+      "labelKey": "SERVER_PROPERTIES.LABEL.RATE_LIMIT",
+      "helpKey": "SERVER_PROPERTIES.HELP.RATE_LIMIT",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "hardcore",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.HARDCORE",
+      "helpKey": "SERVER_PROPERTIES.HELP.HARDCORE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "white-list",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.WHITE_LIST",
+      "helpKey": "SERVER_PROPERTIES.HELP.WHITE_LIST",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "broadcast-console-to-ops",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.BROADCAST_CONSOLE_TO_OPS",
+      "helpKey": "SERVER_PROPERTIES.HELP.BROADCAST_CONSOLE_TO_OPS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "spawn-npcs",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.SPAWN_NPCS",
+      "helpKey": "SERVER_PROPERTIES.HELP.SPAWN_NPCS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "spawn-animals",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.SPAWN_ANIMALS",
+      "helpKey": "SERVER_PROPERTIES.HELP.SPAWN_ANIMALS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "log-ips",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.LOG_IPS",
+      "helpKey": "SERVER_PROPERTIES.HELP.LOG_IPS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "function-permission-level",
+      "type": "INTEGER",
+      "defaultValue": "2",
+      "min": 1,
+      "max": 4,
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.FUNCTION_PERMISSION_LEVEL",
+      "helpKey": "SERVER_PROPERTIES.HELP.FUNCTION_PERMISSION_LEVEL",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "initial-enabled-packs",
+      "type": "STRING",
+      "defaultValue": "vanilla",
+      "category": "gameplay",
+      "labelKey": "SERVER_PROPERTIES.LABEL.INITIAL_ENABLED_PACKS",
+      "helpKey": "SERVER_PROPERTIES.HELP.INITIAL_ENABLED_PACKS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "level-type",
+      "type": "STRING",
+      "defaultValue": "minecraft\\:normal",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.LEVEL_TYPE",
+      "helpKey": "SERVER_PROPERTIES.HELP.LEVEL_TYPE",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "text-filtering-config",
+      "type": "STRING",
+      "defaultValue": "",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.TEXT_FILTERING_CONFIG",
+      "helpKey": "SERVER_PROPERTIES.HELP.TEXT_FILTERING_CONFIG",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "spawn-monsters",
+      "type": "BOOLEAN",
+      "defaultValue": "true",
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.SPAWN_MONSTERS",
+      "helpKey": "SERVER_PROPERTIES.HELP.SPAWN_MONSTERS",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "enforce-whitelist",
+      "type": "BOOLEAN",
+      "defaultValue": "false",
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.ENFORCE_WHITELIST",
+      "helpKey": "SERVER_PROPERTIES.HELP.ENFORCE_WHITELIST",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "spawn-protection",
+      "type": "INTEGER",
+      "defaultValue": "16",
+      "min": 0,
+      "max": 128,
+      "category": "security",
+      "labelKey": "SERVER_PROPERTIES.LABEL.SPAWN_PROTECTION",
+      "helpKey": "SERVER_PROPERTIES.HELP.SPAWN_PROTECTION",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "resource-pack-sha1",
+      "type": "STRING",
+      "defaultValue": "",
+      "category": "general",
+      "labelKey": "SERVER_PROPERTIES.LABEL.RESOURCE_PACK_SHA1",
+      "helpKey": "SERVER_PROPERTIES.HELP.RESOURCE_PACK_SHA1",
+      "minecraftVersion": "1.20"
+    },
+    {
+      "key": "max-world-size",
+      "type": "INTEGER",
+      "defaultValue": "29999984",
+      "min": 1,
+      "category": "world",
+      "labelKey": "SERVER_PROPERTIES.LABEL.MAX_WORLD_SIZE",
+      "helpKey": "SERVER_PROPERTIES.HELP.MAX_WORLD_SIZE",
+      "minecraftVersion": "1.20"
+    }
+  ]
+}

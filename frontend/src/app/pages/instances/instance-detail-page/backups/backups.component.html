@@ -1,0 +1,68 @@
+<div class="backups-container">
+  <div class="header">
+    <h2>{{ 'BACKUPS.TITLE' | translate }}</h2>
+    <button mat-flat-button color="primary" (click)="createBackup()" [disabled]="isCreating()">
+      <mat-icon>add</mat-icon>
+      {{ 'BACKUPS.CREATE' | translate }}
+    </button>
+  </div>
+
+  <div class="table-container mat-elevation-z2">
+    <table mat-table [dataSource]="backups()">
+
+      <ng-container matColumnDef="name">
+        <th mat-header-cell *matHeaderCellDef>{{ 'BACKUPS.COL_NAME' | translate }}</th>
+        <td mat-cell *matCellDef="let element">{{ element.name }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="date">
+        <th mat-header-cell *matHeaderCellDef>{{ 'BACKUPS.COL_DATE' | translate }}</th>
+        <td mat-cell *matCellDef="let element">{{ element.timestamp | date:'medium' }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="size">
+        <th mat-header-cell *matHeaderCellDef>{{ 'BACKUPS.COL_SIZE' | translate }}</th>
+        <td mat-cell *matCellDef="let element">{{ formatBytes(element.size) }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>{{ 'BACKUPS.COL_ACTIONS' | translate }}</th>
+        <td mat-cell *matCellDef="let element" class="actions-cell">
+          <button
+            mat-icon-button
+            color="primary"
+            [disabled]="!!restoringName()"
+            [matTooltip]="'BACKUPS.RESTORE_TOOLTIP' | translate"
+            (click)="restoreBackup(element)"
+          >
+            @if (restoringName() === element.name) {
+              <mat-icon class="spin">sync</mat-icon>
+            } @else {
+              <mat-icon>restore</mat-icon>
+            }
+          </button>
+          <button
+            mat-icon-button
+            color="warn"
+            [disabled]="!!restoringName()"
+            [matTooltip]="'BACKUPS.DELETE_TOOLTIP' | translate"
+            (click)="deleteBackup(element.name)"
+          >
+            <mat-icon>delete</mat-icon>
+          </button>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;"></tr>
+    </table>
+
+    @if (backups().length === 0 && !isLoading()) {
+      <div class="empty-state">{{ 'BACKUPS.EMPTY' | translate }}</div>
+    }
+
+    @if (isLoading()) {
+      <div class="loading">{{ 'BACKUPS.LOADING' | translate }}</div>
+    }
+  </div>
+</div>

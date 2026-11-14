@@ -1,0 +1,59 @@
+<form [formGroup]="form" class="general-form">
+  <h2>{{ 'NEW_INSTANCE.GENERAL' | translate }}</h2>
+
+  <mat-form-field>
+    <mat-label>{{ 'NEW_INSTANCE.PROJECT_NAME' | translate }}</mat-label>
+    <input matInput formControlName="name">
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>{{ 'NEW_INSTANCE.PROJECT_DESCRIPTION' | translate }}</mat-label>
+    <textarea matInput formControlName="description"></textarea>
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>{{ 'NEW_INSTANCE.MINECRAFT_VERSION' | translate }}</mat-label>
+    <input matInput formControlName="gameVersion">
+  </mat-form-field>
+
+  <mat-form-field>
+    <mat-label>{{ 'NEW_INSTANCE.MOD_LOADER' | translate }}</mat-label>
+    <input matInput formControlName="modLoader">
+  </mat-form-field>
+
+  @if (loaderVersion()) {
+    <mat-form-field>
+      <mat-label>{{ 'NEW_INSTANCE.LOADER_VERSION' | translate }}</mat-label>
+      <input matInput formControlName="loaderVersion">
+    </mat-form-field>
+  }
+
+  <mat-form-field>
+    <mat-label>Java Version</mat-label>
+    <mat-select formControlName="javaPath">
+      <mat-option value="">Default (System Path)</mat-option>
+      @for (path of javaVersions(); track path) {
+        <mat-option [value]="path">{{ path }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  @if (hasInstance()) {
+    <div class="actions">
+      <app-button
+        [text]="'NEW_INSTANCE.SAVE_CHANGES' | translate"
+        styleType="primary"
+        [disabled]="isSubmitting()"
+        (click)="saveChanges()"
+      ></app-button>
+
+      @if (statusMessage()) {
+        <span class="status" [class.success]="statusType() === 'success'" [class.error]="statusType() === 'error'">
+          {{ statusMessage() | translate }}
+        </span>
+      }
+    </div>
+  } @else if (!isLoadingInstance()) {
+    <p class="status error">{{ 'NEW_INSTANCE.INSTANCE_UNAVAILABLE' | translate }}</p>
+  }
+</form>

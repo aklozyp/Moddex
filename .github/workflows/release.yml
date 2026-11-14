@@ -1,14 +1,36 @@
 name: release
 
+# Läuft auf GitHub (aklozyp/Moddex), sobald der Forgejo-Workflow "Main-Release" main und den Tag v<VERSION>
+# hierher übertragen hat (oder ein Tag 'v*' von Hand gepusht wird). Auf Forgejo wird diese Datei nicht
+# benutzt (dort gilt .forgejo/workflows).
+#
+# Tests laufen hier bewusst NICHT noch einmal: der zugehörige Quellstand wurde vorher auf Forgejo vollständig getestet
+# (Workflow "Main-Release"). Geprüft wird hier nur, dass Tag und VERSION zusammenpassen und die Skripte
+# syntaktisch in Ordnung sind; Backend-Kompilierung und Frontend-Build passieren im Bundle-Schritt.
+#
+# Release-Gate (Issue #186): vor der Veröffentlichung läuft scripts/release-gate.sh gegen das fertige
+# Bundle. Es verifiziert den Digest gegen genau die Prüfsummendateien, die veröffentlicht werden, und
+# installiert das Archiv auf diesem frischen GitHub-Runner (VM mit systemd) end-to-end inklusive
+# Service- und Erreichbarkeitsnachweis. Ein Gate-Fehler verhindert die Veröffentlichung.
+#
+# Manueller Start (workflow_dispatch) ist ein Probelauf: Es wird gebaut und das Gate ausgeführt, aber
+# NICHT veröffentlicht (der Publish-Schritt läuft nur bei Tag-Push). Der optionale Input "ref"
+# checkt für den Probelauf einen Branch/SHA aus, sodass das Gate gegen den aktuellen Stand laufen
+# kann, obwohl die vorhandenen v0.1.x-Tags noch aus der Zeit vor dem Monorepo stammen (dort gibt
+# es keine VERSION-Datei); der Input "tag" bleibt Namensgeber und VERSION-Maßstab.
 on:
   push:
     tags:
-      - 'v*'          # build & release for tags like v0.1.0
+      - 'v*'          # Bauen & Veröffentlichen für Tags wie v0.1.3
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag (e.g. v0.1.0) that will be checked out in all repos for the release'
+        description: 'Tag (z. B. v0.1.2), der für Artefaktnamen und VERSION-Prüfung verwendet wird'
         required: true
+        type: string
+      ref:
+        description: 'Optionaler auszucheckender Ref (Branch/SHA) für den Gate-Probelauf. Standard: der Tag.'
+        required: false
         type: string
 
 concurrency:
@@ -19,84 +41,136 @@ jobs:
   build-package:
     runs-on: ubuntu-22.04
     permissions:
-      contents: write   # required for release upload
+      contents: write   # Release anlegen und Dateien hochladen
     env:
       TARGET_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref_name }}
+      # Probelauf: optionaler Ref (Standard der Tag); Tag-Push checkt immer den Tag aus.
+      CHECKOUT_REF: ${{ github.event_name == 'workflow_dispatch' && (github.event.inputs.ref || github.event.inputs.tag) || github.ref_name }}
 
     steps:
-      # 1) Checkout this packaging repo
+      # 1) Das Monorepo wird genau einmal ausgecheckt (Backend, Frontend, Skripte liegen darin).
+      #    Volle Historie + Tags werden für die Release-Notizen gebraucht.
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ env.CHECKOUT_REF }}
           fetch-depth: 0
 
-      # 4) Java 21 + Maven cache
+      - name: Check tag, VERSION and scripts
+        run: |
+          if [[ ! "${TARGET_REF}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '${TARGET_REF}' hat nicht das Format vX.Y.Z"; exit 1
+          fi
+          file_version="$(tr -d '[:space:]' < VERSION)"
+          if [[ "v${file_version}" != "${TARGET_REF}" ]]; then
+            echo "::error::VERSION (${file_version}) passt nicht zum Tag ${TARGET_REF}"; exit 1
+          fi
+          for f in scripts/*.sh; do bash -n "$f"; done
+
+      # 2) Java 21 + Maven-Cache
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
+          cache-dependency-path: backend/pom.xml
 
-      # 5) Build backend (via mvnw in backend folder)
-      - name: Run backend tests
-        run: |
-          chmod +x Moddex-Backend/mvnw
-          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pci test
-
-      - name: Build backend JAR
-        run: |
-          Moddex-Backend/mvnw -f Moddex-Backend/pom.xml -B -Pprod -DskipTests clean package
-
-      # 6) Node 20 + npm cache
+      # 3) Node 20 + npm-Cache
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'Moddex-Frontend/package-lock.json'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      # 7) Build frontend dist
-      - name: Install frontend dependencies
-        run: |
-          pushd Moddex-Frontend
-          npm ci
-          popd
-
-      - name: Run frontend tests
-        run: |
-          pushd Moddex-Frontend
-          npm run test -- --watch=false --browsers=ChromeHeadless
-          popd
-
-      - name: Build frontend dist
-        run: |
-          pushd Moddex-Frontend
-          npm run build -- --configuration production
-          popd
-
+      # 4) Backend-JAR (-Pprod), Frontend-Produktionsbuild und Bundle in einem Schritt (scripts/build-bundle.sh)
       - name: Build deployment bundle
-        env:
-          VERSION: ${{ env.TARGET_REF }}
-        run: |
-          chmod +x Moddex-build/scripts/build-bundle.sh
-          VERSION=${{ env.TARGET_REF }} Moddex-build/scripts/build-bundle.sh
+        run: VERSION="${TARGET_REF}" bash scripts/build-bundle.sh
 
+      # 5) Alle Release-Dateien zusammenstellen
+      #    Weitere Installer/Pakete (z. B. Windows, .deb) kommen später hier hinzu: jeweils bauen, nach
+      #    release/ kopieren und in SHA256SUMS aufnehmen (siehe docs/entwicklung-und-release.md).
       - name: Prepare release artifacts
         run: |
-          cp Moddex-build/build/moddex-${TARGET_REF}-linux-amd64.tar.gz .
-          cp Moddex-build/build/moddex-${TARGET_REF}-linux-amd64.tar.gz.sha256 .
-          cp Moddex-build/scripts/download.sh download.sh
+          set -euo pipefail
+          mkdir -p release
+          bundle="moddex-${TARGET_REF}-linux-amd64"
+          cp "build/${bundle}.tar.gz" "build/${bundle}.tar.gz.sha256" release/
+          # ZIP desselben Bundles (gleicher Inhalt wie das tar.gz, ohne Oberordner)
+          (cd build/bundle && zip -qr "../../release/${bundle}.zip" .)
+          cp scripts/download.sh release/download.sh
+          cd release
+          sha256sum "${bundle}.zip" > "${bundle}.zip.sha256"
           sha256sum download.sh > download.sh.sha256
+          # zusammengefasste Prüfsummen aller Hauptdateien
+          sha256sum "${bundle}.tar.gz" "${bundle}.zip" download.sh > SHA256SUMS
+          sha256sum -c SHA256SUMS
+          ls -lh
 
-      # 10) Create release and upload assets
+      # 6) Release-Gate (Issue #186) gegen das ENDGÜLTIGE Bundle: scripts/release-gate.sh
+      #    verifiziert den Digest gegen die oben erzeugten, später veröffentlichten Prüfsummendateien
+      #    und installiert das Archiv auf diesem frischen Runner (VM mit systemd) über den
+      #    veröffentlichten Downloader. Ein Fehler bricht hier ab, bevor veröffentlicht wird.
+      #    Das Gate-Skript kommt aus dem Commit dieses Laufs (github.sha): der erste Checkout oben
+      #    zeigt auf CHECKOUT_REF (Tag oder Probelauf-Ref), dieser zweite (partielle) Checkout auf
+      #    den Workflow-Stand, der den Probelauf auslöst.
+      - name: Checkout release gate script
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          sparse-checkout: scripts
+          path: gate-src
+
+      - name: Release gate (digest + install on fresh host)
+        env:
+          MODDEX_GATE_STAGE_ROOT: ${{ runner.temp }}/release-gate-stage
+        run: bash gate-src/scripts/release-gate.sh release "${TARGET_REF}"
+
+      # 7) Release-Notizen automatisch aus den Commits seit dem letzten Tag
+      - name: Generate release notes
+        run: |
+          set -euo pipefail
+          prev="$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD^ 2>/dev/null || true)"
+          {
+            echo "## Installation"
+            echo
+            echo '```bash'
+            echo "curl -fsSLO https://github.com/${GITHUB_REPOSITORY}/releases/download/${TARGET_REF}/download.sh"
+            echo "curl -fsSLO https://github.com/${GITHUB_REPOSITORY}/releases/download/${TARGET_REF}/download.sh.sha256"
+            echo 'sha256sum -c download.sh.sha256 && bash download.sh'
+            echo '```'
+            echo
+            if [[ -n "${prev}" ]]; then
+              echo "## Changes since ${prev}"
+              range="${prev}..HEAD"
+            else
+              echo "## Changes"
+              range="HEAD"
+            fi
+            echo
+            git log --no-merges --max-count=100 --pretty='- %s (%h)' "${range}"
+            echo
+            echo "Checksums of all files: \`SHA256SUMS\`"
+          } > release-notes.md
+          cat release-notes.md
+
+      # 8) Release anlegen und Dateien hochladen - nur bei echtem Tag-Push. Ein manueller
+      #    Start (workflow_dispatch) ist ein Probelauf mit Gate und veröffentlicht nichts.
       - name: Create GitHub Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TARGET_REF }}
+          name: ${{ env.TARGET_REF }}
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
           files: |
-            moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz
-            moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz.sha256
-            download.sh
-            download.sh.sha256
-
+            release/moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz
+            release/moddex-${{ env.TARGET_REF }}-linux-amd64.tar.gz.sha256
+            release/moddex-${{ env.TARGET_REF }}-linux-amd64.zip
+            release/moddex-${{ env.TARGET_REF }}-linux-amd64.zip.sha256
+            release/download.sh
+            release/download.sh.sha256
+            release/SHA256SUMS
